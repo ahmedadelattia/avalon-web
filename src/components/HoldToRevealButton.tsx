@@ -10,6 +10,8 @@ interface Props {
   power: RolePowerText
   visiblePlayers: string[]
   belowPrimary?: ReactNode
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 export function HoldToRevealButton({
@@ -19,21 +21,31 @@ export function HoldToRevealButton({
   power,
   visiblePlayers,
   belowPrimary,
+  open,
+  onOpenChange,
 }: Props) {
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+  const isOpen = open ?? internalOpen
+
+  function setOpen(nextOpen: boolean) {
+    if (open === undefined) {
+      setInternalOpen(nextOpen)
+    }
+    onOpenChange?.(nextOpen)
+  }
 
   return (
     <div className="rounded-xl border border-slate-700 bg-slate-900/80 p-3">
       <button
         type="button"
         className="w-full rounded-lg bg-amber-500 px-4 py-3 text-sm font-semibold text-slate-950 active:scale-[0.99]"
-        onClick={() => setOpen((prev) => !prev)}
-        aria-pressed={open}
+        onClick={() => setOpen(!isOpen)}
+        aria-pressed={isOpen}
       >
-        {open ? 'Hide Role Details' : 'Reveal Role & Powers'}
+        {isOpen ? 'Hide Role Details' : 'Reveal Role & Powers'}
       </button>
       {belowPrimary ? <div className="mt-2">{belowPrimary}</div> : null}
-      {open ? (
+      {isOpen ? (
         <div className="mt-3 rounded-lg bg-slate-950/80 p-3 text-sm">
           <div className="flex items-center gap-3">
             <img

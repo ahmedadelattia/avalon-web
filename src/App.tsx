@@ -218,6 +218,7 @@ function App() {
   const [roomCodeInput, setRoomCodeInput] = useState(() => deepLinkRoomCode ?? '')
   const [entry, setEntry] = useState<RoomEntry>({ ready: false })
   const [teamDraft, setTeamDraft] = useState<string[]>([])
+  const [isRevealOpen, setIsRevealOpen] = useState(false)
   const localIdentity = useMemo(() => createIdentity('Local Player'), [])
   const normalizedRoomInput = useMemo(
     () => normalizeRoomCode(roomCodeInput),
@@ -269,6 +270,10 @@ function App() {
     if (state.phase !== 'team_proposal') {
       setTeamDraft([])
     }
+  }, [state?.phase])
+
+  useEffect(() => {
+    setIsRevealOpen(false)
   }, [state?.phase])
 
   useEffect(() => {
@@ -464,9 +469,15 @@ function App() {
         state.players.find((player) => player.actorId === id)?.displayName ?? id,
     )
     .filter((name, index, arr) => arr.indexOf(name) === index)
-  const revealHighlightIds = myVisibility?.seesEvilIds ?? []
-  const roundTableHighlightIds =
-    state.phase === 'private_reveal' ? revealHighlightIds : visiblePlayerIds
+  const revealHighlightIds = myVisibility
+    ? [
+        ...new Set([
+          ...myVisibility.seesEvilIds,
+          ...(myRole?.alignment === 'evil' && identity ? [identity.actorId] : []),
+        ]),
+      ]
+    : []
+  const roundTableHighlightIds = isRevealOpen ? revealHighlightIds : []
 
   return (
     <main className="mx-auto min-h-dvh max-w-xl bg-[radial-gradient(circle_at_top,#172554,transparent_65%),linear-gradient(180deg,#020617,#0f172a)] px-4 py-6 text-slate-100">
@@ -553,6 +564,8 @@ function App() {
               alignmentLabel={myRole.alignment.toUpperCase()}
               power={getRolePowerText(myRole.role)}
               visiblePlayers={visiblePlayerNames}
+              open={isRevealOpen}
+              onOpenChange={setIsRevealOpen}
               belowPrimary={
                 state.phase === 'private_reveal'
                   ? !state.revealDismissedBy.includes(identity.actorId)
