@@ -161,7 +161,7 @@ function RoundTable({
                   isDisabled ? 'opacity-45' : ''
                 }`}
               >
-                <p className="truncate font-semibold text-slate-100">
+                <p className="truncate text-[10px] font-semibold text-slate-100">
                   {player.displayName}
                 </p>
                 <p className="text-[10px] text-slate-400">
