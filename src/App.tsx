@@ -35,10 +35,113 @@ function Section({
   children: ReactNode
 }) {
   return (
-    <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 shadow-xl shadow-black/20">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-300">{title}</h2>
+    <section className="rounded-lg border border-slate-800 bg-slate-900 p-4">
+      <h2 className="text-xs font-medium text-slate-400">{title}</h2>
       <div className="mt-3">{children}</div>
     </section>
+  )
+}
+
+function ActionPanel({
+  title,
+  subtitle,
+  footer,
+  children,
+}: {
+  title: string
+  subtitle?: string
+  footer?: ReactNode
+  children: ReactNode
+}) {
+  return (
+    <div className="overflow-hidden rounded-lg border border-slate-700 bg-slate-900">
+      <div className="border-b border-slate-800 px-4 py-3">
+        <h3 className="text-base font-semibold text-slate-100">{title}</h3>
+        {subtitle ? <p className="mt-0.5 text-sm text-slate-400">{subtitle}</p> : null}
+      </div>
+      <div className="px-4 py-5">{children}</div>
+      {footer ? (
+        <div className="border-t border-slate-800 px-4 py-3 text-sm text-slate-400">{footer}</div>
+      ) : null}
+    </div>
+  )
+}
+
+function VoteButton({
+  label,
+  icon,
+  tone,
+  onClick,
+  disabled = false,
+}: {
+  label: string
+  icon: string
+  tone: 'approve' | 'reject' | 'success' | 'fail'
+  onClick: () => void
+  disabled?: boolean
+}) {
+  const styles = {
+    approve: 'border-emerald-700 bg-emerald-800 text-emerald-50 hover:bg-emerald-700',
+    reject: 'border-rose-800 bg-rose-900 text-rose-50 hover:bg-rose-800',
+    success: 'border-emerald-700 bg-emerald-800 text-emerald-50 hover:bg-emerald-700',
+    fail: 'border-rose-800 bg-rose-900 text-rose-50 hover:bg-rose-800',
+  } as const
+
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={`rounded-lg border px-4 py-5 transition-colors active:opacity-80 disabled:cursor-not-allowed disabled:opacity-40 ${styles[tone]}`}
+    >
+      <div className="flex flex-col items-center gap-2">
+        <span className="text-4xl leading-none">{icon}</span>
+        <span className="text-lg font-bold">{label}</span>
+      </div>
+    </button>
+  )
+}
+
+function ResultIcon({ success }: { success: boolean }) {
+  return (
+    <div className="flex justify-center">
+      <div
+        className={`flex h-28 w-28 items-center justify-center rounded-xl border text-6xl ${
+          success
+            ? 'border-emerald-700 bg-emerald-900/60 text-emerald-300'
+            : 'border-rose-800 bg-rose-900/60 text-rose-300'
+        }`}
+      >
+        {success ? '✓' : '✕'}
+      </div>
+    </div>
+  )
+}
+
+function TeamResultPanel({ approved }: { approved: boolean }) {
+  return (
+    <ActionPanel title={approved ? 'Team Approved' : 'Team Rejected'}>
+      <ResultIcon success={approved} />
+    </ActionPanel>
+  )
+}
+
+function QuestResultPanel({
+  outcome,
+}: {
+  outcome: { success: boolean; failCount: number; questNumber: number }
+}) {
+  const failLabel =
+    outcome.failCount === 0
+      ? 'No fail cards played.'
+      : `${outcome.failCount} fail card${outcome.failCount > 1 ? 's' : ''} played.`
+  return (
+    <ActionPanel
+      title={`Quest ${outcome.questNumber} — ${outcome.success ? 'Passed' : 'Failed'}`}
+      subtitle={failLabel}
+    >
+      <ResultIcon success={outcome.success} />
+    </ActionPanel>
   )
 }
 
@@ -52,11 +155,9 @@ function QuestTrack({
   playerCount: number
 }) {
   return (
-    <div className="rounded-2xl border border-amber-800/40 bg-slate-900/70 p-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-amber-300">
-        Quest Track
-      </p>
-      <div className="mt-2 grid grid-cols-5 gap-2">
+    <div className="rounded-lg border border-slate-800 bg-slate-900 p-3">
+      <p className="mb-2 text-xs font-medium text-slate-400">Quest Track</p>
+      <div className="grid grid-cols-5 gap-2">
         {Array.from({ length: 5 }, (_, idx) => {
           const questNum = idx + 1
           const done = idx < outcomes.length
@@ -102,21 +203,20 @@ function QuestTrack({
 
 function RejectionTrack({ rejectionCount }: { rejectionCount: number }) {
   return (
-    <div className="rounded-2xl border border-amber-800/40 bg-slate-900/70 p-3">
-      <div className="grid grid-cols-5 gap-2">
+    <div className="grid grid-cols-5 gap-2">
         {Array.from({ length: 5 }, (_, idx) => {
           const attempt = idx + 1
           const rejected = attempt <= rejectionCount
           return (
             <div
               key={attempt}
-              className="rounded-xl border border-slate-700 bg-slate-950/50 p-2"
+              className="rounded-lg border border-slate-700 bg-slate-950/50 p-2"
             >
               <div
                 className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full border text-xs font-semibold ${
                   rejected
-                    ? 'border-rose-400 bg-rose-500/80 text-white'
-                    : 'border-slate-500 bg-transparent text-slate-300'
+                    ? 'border-rose-500 bg-rose-600/80 text-white'
+                    : 'border-slate-600 bg-transparent text-slate-400'
                 }`}
               >
                 {attempt}
@@ -125,7 +225,6 @@ function RejectionTrack({ rejectionCount }: { rejectionCount: number }) {
           )
         })}
       </div>
-    </div>
   )
 }
 
@@ -159,7 +258,7 @@ function RoundTable({
   const radius = 38
   const center = 50
   return (
-    <div className="rounded-2xl border border-slate-700 bg-slate-900/70 p-3">
+    <div className="rounded-lg border border-slate-700 bg-slate-900 p-3">
       <div className="relative mx-auto aspect-square w-full max-w-[21rem] rounded-full border-2 border-slate-600/80 bg-[radial-gradient(circle,#0f172a,#020617)]">
         <div className="absolute inset-[22%] rounded-full border border-slate-700 bg-slate-950/40" />
         {players.map((player, index) => {
@@ -411,13 +510,13 @@ function App() {
 
   if (!entry.ready) {
     return (
-      <main className="mx-auto min-h-dvh max-w-xl bg-[radial-gradient(circle_at_top,#172554,transparent_60%),linear-gradient(170deg,#020617,#0f172a)] px-4 py-8 text-slate-100">
+      <main className="mx-auto min-h-dvh max-w-xl bg-slate-950 px-4 py-8 text-slate-100">
         <div className="space-y-6">
-          <header className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.2em] text-amber-300">Avalon</p>
-            <h1 className="text-3xl font-black leading-tight">Mobile Command Table</h1>
-            <p className="text-sm text-slate-300">
-              Browser-only social deduction with private role reveals and synchronized turns.
+          <header className="space-y-1">
+            <p className="text-sm font-medium text-amber-400">Avalon</p>
+            <h1 className="text-2xl font-bold">Mobile Command Table</h1>
+            <p className="text-sm text-slate-400">
+              Browser-based social deduction with private role reveals and synchronized turns.
             </p>
           </header>
 
@@ -432,7 +531,7 @@ function App() {
 
           <Section title="Create Room">
             <button
-              className="w-full rounded-xl bg-emerald-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-40"
+              className="w-full rounded-lg bg-emerald-500 px-4 py-3 font-semibold text-slate-950 disabled:opacity-40"
               disabled={displayName.trim().length < 2}
               onClick={() => {
                 const roomCode = randomRoomCode()
@@ -463,7 +562,7 @@ function App() {
                 }
               />
               <button
-                className="w-full rounded-xl bg-amber-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-40"
+                className="w-full rounded-lg bg-amber-500 px-4 py-3 font-semibold text-slate-950 disabled:opacity-40"
                 disabled={
                   displayName.trim().length < 2 ||
                   !isValidRoomCode(normalizedRoomInput)
@@ -604,7 +703,7 @@ function App() {
       : {}
 
   return (
-    <main className="mx-auto min-h-dvh max-w-xl bg-[radial-gradient(circle_at_top,#172554,transparent_65%),linear-gradient(180deg,#020617,#0f172a)] px-4 py-6 text-slate-100">
+    <main className="mx-auto min-h-dvh max-w-xl bg-slate-950 px-4 py-6 text-slate-100">
       <div className="space-y-4">
         <InviteTools
           roomCode={state.room.roomCode}
@@ -713,8 +812,8 @@ function App() {
               </p>
 
               {state.hostActorId === identity.actorId ? (
-                <div className="space-y-3 rounded-xl border border-slate-700 bg-slate-950/40 p-3">
-                  <p className="text-xs uppercase tracking-wide text-slate-400">Role Toggles</p>
+                <div className="space-y-3 rounded-lg border border-slate-700 bg-slate-950/40 p-3">
+                  <p className="text-xs font-medium text-slate-400">Role Toggles</p>
                 <div className="grid grid-cols-2 gap-2 text-sm">
                   {(
                     [
@@ -883,105 +982,121 @@ function App() {
         ) : null}
 
         {state.phase === 'proposal_vote' ? (
-          <Section title="Proposal Vote">
-            <div className="space-y-3 text-sm">
-              {!Object.hasOwn(state.round.proposalVotes, identity.actorId) ? (
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    className="rounded-2xl border border-emerald-300/40 bg-emerald-500/15 px-3 py-4 font-semibold text-emerald-100 shadow-lg shadow-emerald-950/30"
-                    onClick={() => dispatch({ type: 'cast_proposal_vote', actorId: identity.actorId, approve: true })}
-                  >
-                    Approve Team
-                  </button>
-                  <button
-                    className="rounded-2xl border border-rose-300/40 bg-rose-500/15 px-3 py-4 font-semibold text-rose-100 shadow-lg shadow-rose-950/30"
-                    onClick={() => dispatch({ type: 'cast_proposal_vote', actorId: identity.actorId, approve: false })}
-                  >
-                    Reject Team
-                  </button>
-                </div>
-              ) : (
-                <p className="text-xs text-slate-400">Vote locked. Waiting for all players.</p>
-              )}
-
-              <div className="rounded-lg bg-slate-950/50 p-3 text-xs text-slate-300">
-                <p>Votes reveal only after all players vote.</p>
-                <p>Submitted: {Object.keys(state.round.proposalVotes).length}/{connectedPlayerCount}</p>
+          <ActionPanel
+            title="Approve this team?"
+            footer={
+              <p>
+                Votes cast: {Object.keys(state.round.proposalVotes).length} / {connectedPlayerCount}
+              </p>
+            }
+          >
+            {!Object.hasOwn(state.round.proposalVotes, identity.actorId) ? (
+              <div className="grid grid-cols-2 gap-3">
+                <VoteButton
+                  label="Approve"
+                  icon="✓"
+                  tone="approve"
+                  onClick={() =>
+                    dispatch({ type: 'cast_proposal_vote', actorId: identity.actorId, approve: true })
+                  }
+                />
+                <VoteButton
+                  label="Reject"
+                  icon="✕"
+                  tone="reject"
+                  onClick={() =>
+                    dispatch({ type: 'cast_proposal_vote', actorId: identity.actorId, approve: false })
+                  }
+                />
               </div>
-            </div>
-          </Section>
+            ) : (
+              <p className="text-sm text-slate-400">Vote locked. Waiting for all players.</p>
+            )}
+          </ActionPanel>
         ) : null}
 
         {state.phase === 'proposal_vote_reveal' ? (
-          <Section title="Team Result">
-            <div className="space-y-3 text-sm">
-              <p className={state.round.proposalApproved ? 'text-emerald-300' : 'text-rose-300'}>
-                {state.round.proposalApproved ? 'Team approved.' : 'Team rejected.'}
-              </p>
-              {state.hostActorId === identity.actorId ? (
-                <button
-                  className="w-full rounded-lg bg-amber-400 px-4 py-3 font-semibold text-slate-950"
-                  onClick={() =>
-                    dispatch({
-                      type: 'advance_proposal_vote_reveal',
-                      actorId: identity.actorId,
-                    })
-                  }
-                >
-                  Continue
-                </button>
-              ) : (
-                <p className="text-xs text-slate-400">Waiting for host to continue.</p>
-              )}
-            </div>
-          </Section>
+          <div className="space-y-4">
+            <TeamResultPanel approved={Boolean(state.round.proposalApproved)} />
+            {state.hostActorId === identity.actorId ? (
+              <button
+                className="w-full rounded-lg bg-amber-400 px-4 py-3 font-semibold text-slate-950"
+                onClick={() =>
+                  dispatch({
+                    type: 'advance_proposal_vote_reveal',
+                    actorId: identity.actorId,
+                  })
+                }
+              >
+                Continue
+              </button>
+            ) : (
+              <p className="text-center text-xs text-slate-400">Waiting for host to continue.</p>
+            )}
+          </div>
         ) : null}
 
         {state.phase === 'quest_vote' ? (
-          <Section title={`Quest ${state.round.questNumber}: Secret Quest Vote`}>
-            <div className="space-y-3 text-sm">
-              <p>
-                Team:{' '}
-                {state.round.proposedTeam
-                  .map((id) => state.players.find((p) => p.actorId === id)?.displayName ?? id)
-                  .join(', ')}
-              </p>
-
-              {isQuestMember(state, identity.actorId) ? (
-                Object.hasOwn(state.round.questVotes, identity.actorId) ? (
-                  <p className="text-xs text-slate-400">Quest card submitted. Waiting for others.</p>
-                ) : (
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      className="rounded-full border border-sky-300/40 bg-sky-500/15 px-3 py-4 font-semibold text-sky-100 shadow-lg shadow-sky-950/30"
-                      onClick={() => dispatch({ type: 'cast_quest_vote', actorId: identity.actorId, card: 'success' })}
-                    >
-                      Play Success
-                    </button>
-                    <button
-                      className="rounded-full border border-amber-300/40 bg-amber-500/15 px-3 py-4 font-semibold text-amber-100 shadow-lg shadow-amber-950/30 disabled:opacity-50"
-                      disabled={!canPlayFail}
-                      onClick={() => dispatch({ type: 'cast_quest_vote', actorId: identity.actorId, card: 'fail' })}
-                    >
-                      Play Fail
-                    </button>
-                  </div>
-                )
+          <ActionPanel
+            title="Quest Action"
+            subtitle="Your vote is final. Individual cards remain secret."
+            footer={
+              !canPlayFail ? (
+                <p>Good players cannot vote Fail in this game.</p>
+              ) : undefined
+            }
+          >
+            {isQuestMember(state, identity.actorId) ? (
+              Object.hasOwn(state.round.questVotes, identity.actorId) ? (
+                <p className="text-sm text-slate-400">Quest card submitted. Waiting for others.</p>
               ) : (
-                <p className="text-xs text-slate-400">You are not on this quest team.</p>
-              )}
+                <div className="grid grid-cols-2 gap-3">
+                  <VoteButton
+                    label="Pass"
+                    icon="✓"
+                    tone="success"
+                    onClick={() =>
+                      dispatch({ type: 'cast_quest_vote', actorId: identity.actorId, card: 'success' })
+                    }
+                  />
+                  <VoteButton
+                    label="Fail"
+                    icon="✕"
+                    tone="fail"
+                    disabled={!canPlayFail}
+                    onClick={() =>
+                      dispatch({ type: 'cast_quest_vote', actorId: identity.actorId, card: 'fail' })
+                    }
+                  />
+                </div>
+              )
+            ) : (
+              <p className="text-sm text-slate-400">You are not on this quest team.</p>
+            )}
+          </ActionPanel>
+        ) : null}
 
-              {!canPlayFail ? (
-                <p className="text-xs text-slate-400">
-                  Good fail voting is disabled by lobby rules.
-                </p>
-              ) : null}
-
-              <p className="text-xs text-slate-400">
-                Individual quest cards remain secret. Only aggregate fail count is revealed.
-              </p>
-            </div>
-          </Section>
+        {state.phase === 'quest_vote_reveal' && state.round.questOutcomes.length > 0 ? (
+          <div className="space-y-4">
+            <QuestResultPanel
+              outcome={state.round.questOutcomes[state.round.questOutcomes.length - 1]!}
+            />
+            {state.hostActorId === identity.actorId ? (
+              <button
+                className="w-full rounded-lg bg-amber-400 px-4 py-3 font-semibold text-slate-950"
+                onClick={() =>
+                  dispatch({
+                    type: 'advance_quest_vote_reveal',
+                    actorId: identity.actorId,
+                  })
+                }
+              >
+                Continue
+              </button>
+            ) : (
+              <p className="text-center text-xs text-slate-400">Waiting for host to continue.</p>
+            )}
+          </div>
         ) : null}
 
         {state.phase === 'lady_of_lake' ? (

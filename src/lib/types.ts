@@ -17,6 +17,7 @@ export type GamePhase =
   | 'proposal_vote'
   | 'proposal_vote_reveal'
   | 'quest_vote'
+  | 'quest_vote_reveal'
   | 'lady_of_lake'
   | 'assassination'
   | 'game_end'
@@ -185,6 +186,7 @@ export type EngineAction =
       card: 'success' | 'fail'
       now: number
     }
+  | { type: 'advance_quest_vote_reveal'; actorId: string; now: number }
   | { type: 'lady_peek'; actorId: string; targetId: string; now: number }
   | { type: 'lady_acknowledge'; actorId: string; now: number }
   | {

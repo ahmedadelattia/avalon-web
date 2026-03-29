@@ -162,7 +162,7 @@ function ensureTeamSize(state: GameState, teamIds: string[]) {
   }
 }
 
-function finalizeQuestIfReady(state: GameState, now: number) {
+function finalizeQuestIfReady(state: GameState) {
   if (state.phase !== 'quest_vote') return
   if (state.round.proposedTeam.length === 0) return
   if (
@@ -190,6 +190,13 @@ function finalizeQuestIfReady(state: GameState, now: number) {
     failCount,
     success,
   })
+
+  // Keep proposedTeam and questVotes so the reveal phase can display who was on the quest
+  state.phase = 'quest_vote_reveal'
+}
+
+function advanceQuestVoteReveal(state: GameState, now: number) {
+  if (state.phase !== 'quest_vote_reveal') return
 
   state.round.proposedTeam = []
   state.round.proposalVotes = {}
@@ -396,7 +403,7 @@ export function reduceGameState(state: GameState, action: EngineAction): GameSta
         finalizeProposalIfReady(next)
       }
       if (next.phase === 'quest_vote') {
-        finalizeQuestIfReady(next, now)
+        finalizeQuestIfReady(next)
       }
       maybeMigrateHost(next, now)
       break
@@ -539,7 +546,16 @@ export function reduceGameState(state: GameState, action: EngineAction): GameSta
         }
       }
       next.round.questVotes[action.actorId] = action.card
-      finalizeQuestIfReady(next, now)
+      finalizeQuestIfReady(next)
+      break
+    }
+
+    case 'advance_quest_vote_reveal': {
+      if (next.phase !== 'quest_vote_reveal') {
+        throw new Error('Not in quest vote reveal phase')
+      }
+      ensureHost(next, action.actorId)
+      advanceQuestVoteReveal(next, now)
       break
     }
 
