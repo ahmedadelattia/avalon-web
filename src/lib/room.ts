@@ -1,6 +1,6 @@
 const ROOM_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
 export const ROOM_CODE_LENGTH = 6
-export const SOLO_TEST_ROOM_CODE = '69420'
+export const SOLO_TEST_ROOM_CODE = 'TESTRM'
 
 export function isSoloTestRoomCode(input: string): boolean {
   return normalizeRoomCode(input) === SOLO_TEST_ROOM_CODE
@@ -17,13 +17,16 @@ export function isValidRoomCode(input: string): boolean {
 
 export function randomRoomCode(length = ROOM_CODE_LENGTH): string {
   let code = ''
-  for (let i = 0; i < length; i += 1) {
-    const idx = Math.floor(
-      (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) *
-        ROOM_ALPHABET.length,
-    )
-    code += ROOM_ALPHABET[idx]
-  }
+  do {
+    code = ''
+    for (let i = 0; i < length; i += 1) {
+      const idx = Math.floor(
+        (crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32) *
+          ROOM_ALPHABET.length,
+      )
+      code += ROOM_ALPHABET[idx]
+    }
+  } while (code === SOLO_TEST_ROOM_CODE)
   return code
 }
 
