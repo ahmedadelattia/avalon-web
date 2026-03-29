@@ -103,10 +103,7 @@ function QuestTrack({
 function RejectionTrack({ rejectionCount }: { rejectionCount: number }) {
   return (
     <div className="rounded-2xl border border-amber-800/40 bg-slate-900/70 p-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-amber-300">
-        Rejection Track
-      </p>
-      <div className="mt-2 grid grid-cols-5 gap-2">
+      <div className="grid grid-cols-5 gap-2">
         {Array.from({ length: 5 }, (_, idx) => {
           const attempt = idx + 1
           const rejected = attempt <= rejectionCount
@@ -163,10 +160,7 @@ function RoundTable({
   const center = 50
   return (
     <div className="rounded-2xl border border-slate-700 bg-slate-900/70 p-3">
-      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-amber-300">
-        Round Table
-      </p>
-      <div className="relative mx-auto mt-4 aspect-square w-full max-w-[21rem] rounded-full border-2 border-slate-600/80 bg-[radial-gradient(circle,#0f172a,#020617)]">
+      <div className="relative mx-auto aspect-square w-full max-w-[21rem] rounded-full border-2 border-slate-600/80 bg-[radial-gradient(circle,#0f172a,#020617)]">
         <div className="absolute inset-[22%] rounded-full border border-slate-700 bg-slate-950/40" />
         {players.map((player, index) => {
           const angle = (index / players.length) * Math.PI * 2 - Math.PI / 2
@@ -563,6 +557,33 @@ function App() {
       : isRevealOpen
         ? revealHighlightIds
         : []
+  const proposalVoteStatusByActorId: Record<string, string> =
+    state.phase === 'proposal_vote_reveal'
+      ? Object.fromEntries(
+          sortedPlayers.map((player) => {
+            const vote = state.round.proposalVotes[player.actorId]
+            return [
+              player.actorId,
+              vote === true
+                ? 'Approve'
+                : vote === false
+                  ? 'Reject'
+                  : player.connected
+                    ? 'Pending'
+                    : 'Offline',
+            ]
+          }),
+        )
+      : {}
+  const proposalVoteToneByActorId: Record<string, 'good' | 'evil'> =
+    state.phase === 'proposal_vote_reveal'
+      ? sortedPlayers.reduce<Record<string, 'good' | 'evil'>>((acc, player) => {
+          const vote = state.round.proposalVotes[player.actorId]
+          if (vote === true) acc[player.actorId] = 'good'
+          if (vote === false) acc[player.actorId] = 'evil'
+          return acc
+        }, {})
+      : {}
   const endgameRoleLabelByActorId: Record<string, string> =
     state.phase === 'game_end'
       ? Object.fromEntries(
@@ -616,14 +637,20 @@ function App() {
             state.phase === 'assassination' ? 'Tap to Nominate' : 'Tap to Add'
           }
           statusByActorId={
-            state.phase === 'game_end'
+            state.phase === 'proposal_vote_reveal'
+              ? proposalVoteStatusByActorId
+              : state.phase === 'game_end'
               ? endgameRoleLabelByActorId
               : state.phase === 'assassination' && state.assassination?.suspectId
                 ? { [state.assassination.suspectId]: 'Suspect' }
                 : {}
           }
           statusToneByActorId={
-            state.phase === 'game_end' ? endgameRoleToneByActorId : {}
+            state.phase === 'proposal_vote_reveal'
+              ? proposalVoteToneByActorId
+              : state.phase === 'game_end'
+                ? endgameRoleToneByActorId
+                : {}
           }
           onPlayerClick={(actorId) => {
             if (canInteractWithRoundTable) {
@@ -823,15 +850,14 @@ function App() {
         ) : null}
 
         {state.phase === 'team_proposal' ? (
-          <Section title={`Quest ${state.round.questNumber}: Team Proposal`}>
+          <Section title={`Quest ${state.round.questNumber}: Team Proposal (${teamSizeRequired} players)`}>
             <div className="space-y-3 text-sm">
               <p>
-                Leader:{' '}
                 <strong>
                   {state.players.find((p) => p.actorId === leaderId)?.displayName ?? 'Unknown'}
-                </strong>
+                </strong>{' '}
+                is choosing.
               </p>
-              <p>Quest size: {getQuestTeamSize(state.players.length, state.round.questNumber)}</p>
 
               {isLeader ? (
                 <div className="space-y-2">
@@ -859,25 +885,19 @@ function App() {
         {state.phase === 'proposal_vote' ? (
           <Section title="Proposal Vote">
             <div className="space-y-3 text-sm">
-              <p>
-                Proposed team:{' '}
-                {state.round.proposedTeam
-                  .map((id) => state.players.find((p) => p.actorId === id)?.displayName ?? id)
-                  .join(', ')}
-              </p>
               {!Object.hasOwn(state.round.proposalVotes, identity.actorId) ? (
                 <div className="grid grid-cols-2 gap-2">
                   <button
-                    className="rounded-lg bg-emerald-400 px-3 py-3 font-semibold text-slate-950"
+                    className="rounded-2xl border border-emerald-300/40 bg-emerald-500/15 px-3 py-4 font-semibold text-emerald-100 shadow-lg shadow-emerald-950/30"
                     onClick={() => dispatch({ type: 'cast_proposal_vote', actorId: identity.actorId, approve: true })}
                   >
-                    Approve
+                    Approve Team
                   </button>
                   <button
-                    className="rounded-lg bg-rose-400 px-3 py-3 font-semibold text-slate-950"
+                    className="rounded-2xl border border-rose-300/40 bg-rose-500/15 px-3 py-4 font-semibold text-rose-100 shadow-lg shadow-rose-950/30"
                     onClick={() => dispatch({ type: 'cast_proposal_vote', actorId: identity.actorId, approve: false })}
                   >
-                    Reject
+                    Reject Team
                   </button>
                 </div>
               ) : (
@@ -893,44 +913,8 @@ function App() {
         ) : null}
 
         {state.phase === 'proposal_vote_reveal' ? (
-          <Section title="Proposal Vote Results">
+          <Section title="Team Result">
             <div className="space-y-3 text-sm">
-              <p>
-                Proposed team:{' '}
-                {state.round.proposedTeam
-                  .map((id) => state.players.find((p) => p.actorId === id)?.displayName ?? id)
-                  .join(', ')}
-              </p>
-              <div className="space-y-2 rounded-lg bg-slate-950/50 p-3 text-xs text-slate-200">
-                {sortedPlayers.map((player) => {
-                  const vote = state.round.proposalVotes[player.actorId]
-                  return (
-                    <div
-                      key={player.actorId}
-                      className="flex items-center justify-between rounded-md border border-slate-800 px-3 py-2"
-                    >
-                      <span>{player.displayName}</span>
-                      <span
-                        className={
-                          vote === true
-                            ? 'text-emerald-300'
-                            : vote === false
-                              ? 'text-rose-300'
-                              : 'text-slate-500'
-                        }
-                      >
-                        {vote === true
-                          ? 'Approve'
-                          : vote === false
-                            ? 'Reject'
-                            : player.connected
-                              ? 'Pending'
-                              : 'Offline'}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
               <p className={state.round.proposalApproved ? 'text-emerald-300' : 'text-rose-300'}>
                 {state.round.proposalApproved ? 'Team approved.' : 'Team rejected.'}
               </p>
@@ -969,17 +953,17 @@ function App() {
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
                     <button
-                      className="rounded-lg bg-emerald-400 px-3 py-3 font-semibold text-slate-950"
+                      className="rounded-full border border-sky-300/40 bg-sky-500/15 px-3 py-4 font-semibold text-sky-100 shadow-lg shadow-sky-950/30"
                       onClick={() => dispatch({ type: 'cast_quest_vote', actorId: identity.actorId, card: 'success' })}
                     >
-                      Success
+                      Play Success
                     </button>
                     <button
-                      className="rounded-lg bg-rose-400 px-3 py-3 font-semibold text-slate-950 disabled:opacity-50"
+                      className="rounded-full border border-amber-300/40 bg-amber-500/15 px-3 py-4 font-semibold text-amber-100 shadow-lg shadow-amber-950/30 disabled:opacity-50"
                       disabled={!canPlayFail}
                       onClick={() => dispatch({ type: 'cast_quest_vote', actorId: identity.actorId, card: 'fail' })}
                     >
-                      Fail
+                      Play Fail
                     </button>
                   </div>
                 )
