@@ -517,7 +517,12 @@ function App() {
         ]),
       ]
     : []
-  const roundTableHighlightIds = isRevealOpen ? revealHighlightIds : []
+  const roundTableHighlightIds =
+    state.phase === 'private_reveal'
+      ? revealHighlightIds
+      : isRevealOpen
+        ? revealHighlightIds
+        : []
 
   return (
     <main className="mx-auto min-h-dvh max-w-xl bg-[radial-gradient(circle_at_top,#172554,transparent_65%),linear-gradient(180deg,#020617,#0f172a)] px-4 py-6 text-slate-100">
@@ -739,9 +744,18 @@ function App() {
                   ) : null}
                 </div>
               ) : null}
-              <p className="text-xs text-slate-400">
-                Confirm using the button under Reveal Role & Powers above.
-              </p>
+              {!state.revealDismissedBy.includes(identity.actorId) ? (
+                <button
+                  className="w-full rounded-lg bg-amber-400 px-4 py-3 font-semibold text-slate-950"
+                  onClick={() => dispatch({ type: 'dismiss_reveal', actorId: identity.actorId })}
+                >
+                  Confirm to Continue
+                </button>
+              ) : (
+                <p className="text-xs text-slate-400">
+                  Waiting for others to confirm ({state.revealDismissedBy.length}/{state.players.length})
+                </p>
+              )}
             </div>
           </Section>
         ) : null}
@@ -785,7 +799,7 @@ function App() {
           </Section>
         ) : null}
 
-        {state.phase !== 'lobby' ? (
+        {state.phase !== 'lobby' && state.phase !== 'private_reveal' ? (
           myRole ? (
             <HoldToRevealButton
               roleKey={myRole.role}
@@ -795,26 +809,6 @@ function App() {
               visiblePlayers={visiblePlayerNames}
               open={isRevealOpen}
               onOpenChange={setIsRevealOpen}
-              belowPrimary={
-                state.phase === 'private_reveal'
-                  ? !state.revealDismissedBy.includes(identity.actorId)
-                    ? (
-                      <button
-                        className="w-full rounded-lg bg-amber-400 px-4 py-3 text-sm font-semibold text-slate-950"
-                        onClick={() =>
-                          dispatch({ type: 'dismiss_reveal', actorId: identity.actorId })
-                        }
-                      >
-                        Confirm to Continue
-                      </button>
-                    )
-                    : (
-                      <p className="text-xs text-slate-400">
-                        Waiting for others to confirm ({state.revealDismissedBy.length}/{state.players.length})
-                      </p>
-                    )
-                  : null
-              }
             />
           ) : null
         ) : null}
