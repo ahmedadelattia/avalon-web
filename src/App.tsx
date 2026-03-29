@@ -45,9 +45,11 @@ function Section({
 function QuestTrack({
   outcomes,
   currentQuest,
+  playerCount,
 }: {
   outcomes: Array<{ success: boolean }>
   currentQuest: number
+  playerCount: number
 }) {
   return (
     <div className="rounded-2xl border border-amber-800/40 bg-slate-900/70 p-3">
@@ -61,11 +63,12 @@ function QuestTrack({
           const outcome = outcomes[idx]
           const icon = done
             ? outcome.success
-              ? '/icons/status/pass.svg'
-              : '/icons/status/fail.svg'
-            : '/icons/status/pending.svg'
+              ? '/icons/status/pass.png'
+              : '/icons/status/fail.png'
+            : null
           const label = done ? (outcome.success ? 'Pass' : 'Fail') : 'Pending'
           const isCurrent = !done && questNum === currentQuest
+          const teamSize = getQuestTeamSize(playerCount, questNum)
           return (
             <div
               key={questNum}
@@ -75,15 +78,20 @@ function QuestTrack({
                   : 'border-slate-700 bg-slate-950/50'
               }`}
             >
-              <p className="text-[10px] uppercase tracking-wide text-slate-400">
-                Q{questNum}
+              {icon ? (
+                <img
+                  src={icon}
+                  alt={label}
+                  className="mx-auto mt-1 h-9 w-9 rounded-full"
+                />
+              ) : (
+                <div className="mx-auto mt-1 flex h-9 w-9 items-center justify-center rounded-full border border-slate-500 text-xs font-semibold text-slate-200">
+                  {teamSize}
+                </div>
+              )}
+              <p className="mt-1 text-[10px] text-slate-300">
+                {`Quest ${questNum}`}
               </p>
-              <img
-                src={icon}
-                alt={label}
-                className="mx-auto mt-1 h-9 w-9"
-              />
-              <p className="mt-1 text-[10px] text-slate-300">{label}</p>
             </div>
           )
         })}
@@ -521,21 +529,22 @@ function App() {
               <p className="text-2xl font-black tracking-wider">{state.room.roomCode}</p>
             </div>
             <div className="text-right text-xs text-slate-400">
+              <div className="mb-2 flex justify-end">
+                <InviteTools roomCode={state.room.roomCode} />
+              </div>
               <p>{sync.transportText}</p>
               <p>{connectedPlayers}/{state.players.length} connected</p>
               <p>Host epoch {state.hostEpoch}</p>
             </div>
           </div>
           {sync.error ? <p className="mt-2 text-xs text-rose-300">{sync.error}</p> : null}
-          <div className="mt-3">
-            <InviteTools roomCode={state.room.roomCode} />
-          </div>
         </header>
 
         {state.phase !== 'lobby' && state.phase !== 'private_reveal' ? (
           <QuestTrack
             outcomes={state.round.questOutcomes}
             currentQuest={state.round.questNumber}
+            playerCount={state.players.length}
           />
         ) : null}
 
@@ -587,40 +596,6 @@ function App() {
             }
           }}
         />
-
-        {state.phase !== 'lobby' ? (
-          myRole ? (
-            <HoldToRevealButton
-              roleKey={myRole.role}
-              roleLabel={roleLabel(myRole.role)}
-              alignmentLabel={myRole.alignment.toUpperCase()}
-              power={getRolePowerText(myRole.role)}
-              visiblePlayers={visiblePlayerNames}
-              open={isRevealOpen}
-              onOpenChange={setIsRevealOpen}
-              belowPrimary={
-                state.phase === 'private_reveal'
-                  ? !state.revealDismissedBy.includes(identity.actorId)
-                    ? (
-                      <button
-                        className="w-full rounded-lg bg-amber-400 px-4 py-3 text-sm font-semibold text-slate-950"
-                        onClick={() =>
-                          dispatch({ type: 'dismiss_reveal', actorId: identity.actorId })
-                        }
-                      >
-                        Confirm to Continue
-                      </button>
-                    )
-                    : (
-                      <p className="text-xs text-slate-400">
-                        Waiting for others to confirm ({state.revealDismissedBy.length}/{state.players.length})
-                      </p>
-                    )
-                  : null
-              }
-            />
-          ) : null
-        ) : null}
 
         {state.phase === 'lobby' ? (
           <Section title="Lobby">
@@ -781,7 +756,6 @@ function App() {
                 </strong>
               </p>
               <p>Quest size: {getQuestTeamSize(state.players.length, state.round.questNumber)}</p>
-              <RejectionTrack rejectionCount={state.round.rejectionCount} />
 
               {isLeader ? (
                 <div className="space-y-2">
@@ -809,6 +783,40 @@ function App() {
               )}
             </div>
           </Section>
+        ) : null}
+
+        {state.phase !== 'lobby' ? (
+          myRole ? (
+            <HoldToRevealButton
+              roleKey={myRole.role}
+              roleLabel={roleLabel(myRole.role)}
+              alignmentLabel={myRole.alignment.toUpperCase()}
+              power={getRolePowerText(myRole.role)}
+              visiblePlayers={visiblePlayerNames}
+              open={isRevealOpen}
+              onOpenChange={setIsRevealOpen}
+              belowPrimary={
+                state.phase === 'private_reveal'
+                  ? !state.revealDismissedBy.includes(identity.actorId)
+                    ? (
+                      <button
+                        className="w-full rounded-lg bg-amber-400 px-4 py-3 text-sm font-semibold text-slate-950"
+                        onClick={() =>
+                          dispatch({ type: 'dismiss_reveal', actorId: identity.actorId })
+                        }
+                      >
+                        Confirm to Continue
+                      </button>
+                    )
+                    : (
+                      <p className="text-xs text-slate-400">
+                        Waiting for others to confirm ({state.revealDismissedBy.length}/{state.players.length})
+                      </p>
+                    )
+                  : null
+              }
+            />
+          ) : null
         ) : null}
 
         {state.phase === 'proposal_vote' ? (
@@ -1013,21 +1021,11 @@ function App() {
           </Section>
         ) : null}
 
-        <Section title="Quest Log">
-          <div className="space-y-2 text-sm">
-            {state.round.questOutcomes.length === 0 ? (
-              <p className="text-slate-400">No completed quests yet.</p>
-            ) : (
-              state.round.questOutcomes.map((quest) => (
-                <div key={quest.questNumber} className="rounded-lg bg-slate-950/50 p-2">
-                  <p>
-                    Quest {quest.questNumber}: {quest.success ? 'Success' : 'Fail'} ({quest.failCount} fail)
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-        </Section>
+        {state.phase !== 'lobby' ? (
+          <Section title="Rejection Track">
+            <RejectionTrack rejectionCount={state.round.rejectionCount} />
+          </Section>
+        ) : null}
       </div>
     </main>
   )

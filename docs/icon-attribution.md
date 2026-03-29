@@ -22,12 +22,10 @@ Files used in this project:
 
 - `lady_of_lake.webp` from `features/lady_of_lake.webp`
 
-## Status Icons (`public/icons/status/*.svg`)
+## Status Assets (`public/icons/status/*`)
 
-Status symbols are based on **Tabler Icons** (MIT License), then simplified in-file for this app:
+Quest status uses custom visual assets:
 
-- Upstream project: https://github.com/tabler/tabler-icons
-- License: https://github.com/tabler/tabler-icons/blob/main/LICENSE
-- `pass.svg` based on `icons/outline/check.svg`
-- `fail.svg` based on `icons/outline/x.svg`
-- `pending.svg` based on `icons/outline/circle.svg`
+- `pass.png` cropped/resized from `Gemini_Generated_Image_qsz6gaqsz6gaqsz6.png`
+- `fail.png` cropped/resized from `Gemini_Generated_Image_bp23m5bp23m5bp23.png`
+- Pending is rendered directly in UI as an empty numbered circle (no file icon)
