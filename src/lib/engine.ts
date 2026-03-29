@@ -7,6 +7,7 @@ import {
   PLAYER_MATRIX,
   requiresTwoFails,
 } from './rules'
+import { SOLO_TEST_ROOM_CODE } from './room'
 import type {
   Alignment,
   EngineAction,
@@ -138,6 +139,11 @@ function prepareQuestRoundForPhase(state: GameState) {
 function nextLeader(state: GameState) {
   const players = sortedPlayers(state)
   if (players.length === 0) return
+  if (state.room.roomCode === SOLO_TEST_ROOM_CODE) {
+    const hostIndex = players.findIndex((p) => p.actorId === state.hostActorId)
+    state.round.leaderOrder = hostIndex >= 0 ? hostIndex : 0
+    return
+  }
   state.round.leaderOrder = (state.round.leaderOrder + 1) % players.length
 }
 
@@ -397,7 +403,12 @@ export function reduceGameState(state: GameState, action: EngineAction): GameSta
       next.visibility = buildVisibility(next.assignments)
       next.phase = 'private_reveal'
       next.revealDismissedBy = []
-      next.round.leaderOrder = firstLeaderOrder(players.length)
+      if (next.room.roomCode === SOLO_TEST_ROOM_CODE) {
+        const hostIndex = players.findIndex((p) => p.actorId === next.hostActorId)
+        next.round.leaderOrder = hostIndex >= 0 ? hostIndex : 0
+      } else {
+        next.round.leaderOrder = firstLeaderOrder(players.length)
+      }
       next.round.questNumber = 1
       next.round.rejectionCount = 0
       next.round.proposedTeam = []

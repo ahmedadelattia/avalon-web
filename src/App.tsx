@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { InviteTools } from './components/InviteTools'
 import { HoldToRevealButton } from './components/HoldToRevealButton'
@@ -11,15 +11,17 @@ import {
 import {
   extractRoomCodeFromLocation,
   isValidRoomCode,
+  isSoloTestRoomCode,
   normalizeRoomCode,
   randomRoomCode,
   ROOM_CODE_LENGTH,
+  SOLO_TEST_ROOM_CODE,
 } from './lib/room'
 import { getRolePowerText, getQuestTeamSize, PLAYER_MATRIX } from './lib/rules'
 import { getRolePortrait } from './lib/roleAssets'
 import { createIdentity, getStoredName } from './lib/storage'
 import { currentTimeMs } from './lib/time'
-import type { EngineAction, PlayerIdentity, Role } from './lib/types'
+import type { EngineAction, PlayerIdentity } from './lib/types'
 import { useRoomSync } from './hooks/useRoomSync'
 
 type WithoutNow<T> = T extends { now: number } ? Omit<T, 'now'> : never
@@ -166,13 +168,20 @@ type RoomEntry =
       isCreator: boolean
     }
 
+const SOLO_BOTS = [
+  { actorId: 'solo-bot-1', displayName: 'Bot 1' },
+  { actorId: 'solo-bot-2', displayName: 'Bot 2' },
+  { actorId: 'solo-bot-3', displayName: 'Bot 3' },
+  { actorId: 'solo-bot-4', displayName: 'Bot 4' },
+] as const
+
 function App() {
-  const optionalRolePortraitByKey: Record<string, Role | null> = {
-    mordred: 'mordred',
-    oberon: 'oberon',
-    morgana: 'morgana',
-    percival: 'percival',
-    ladyOfTheLake: null,
+  const optionalRoleIconByKey: Record<string, string> = {
+    mordred: getRolePortrait('mordred'),
+    oberon: getRolePortrait('oberon'),
+    morgana: getRolePortrait('morgana'),
+    percival: getRolePortrait('percival'),
+    ladyOfTheLake: '/icons/features/lady_of_lake.webp',
   }
 
   const deepLinkRoomCode = useMemo(() => {
@@ -206,6 +215,9 @@ function App() {
 
   const state = entry.ready ? sync.state : null
   const identity = entry.ready ? entry.identity : null
+  const isSoloTestRoom = entry.ready
+    ? isSoloTestRoomCode(entry.roomCode)
+    : false
 
   const myRole = useMemo(() => {
     if (!state || !identity) return undefined
@@ -226,6 +238,58 @@ function App() {
     if (!entry.ready) return
     await sync.dispatch({ ...action, now: currentTimeMs() } as EngineAction)
   }
+
+  useEffect(() => {
+    if (!isSoloTestRoom || !state || !identity) return
+
+    if (state.phase === 'lobby' && state.players.length < 5) {
+      const existingIds = new Set(state.players.map((p) => p.actorId))
+      for (const bot of SOLO_BOTS) {
+        if (!existingIds.has(bot.actorId)) {
+          void dispatch({
+            type: 'player_join',
+            actorId: bot.actorId,
+            displayName: bot.displayName,
+          })
+        }
+      }
+      return
+    }
+
+    if (state.phase === 'private_reveal') {
+      for (const bot of SOLO_BOTS) {
+        if (state.revealDismissedBy.includes(bot.actorId)) continue
+        if (!state.players.some((p) => p.actorId === bot.actorId)) continue
+        void dispatch({ type: 'dismiss_reveal', actorId: bot.actorId })
+      }
+      return
+    }
+
+    if (state.phase === 'proposal_vote') {
+      for (const bot of SOLO_BOTS) {
+        if (!(bot.actorId in state.round.proposalVotes)) {
+          void dispatch({
+            type: 'cast_proposal_vote',
+            actorId: bot.actorId,
+            approve: true,
+          })
+        }
+      }
+      return
+    }
+
+    if (state.phase === 'quest_vote') {
+      for (const bot of SOLO_BOTS) {
+        if (!state.round.proposedTeam.includes(bot.actorId)) continue
+        if (bot.actorId in state.round.questVotes) continue
+        void dispatch({
+          type: 'cast_quest_vote',
+          actorId: bot.actorId,
+          card: 'success',
+        })
+      }
+    }
+  }, [dispatch, identity, isSoloTestRoom, state])
 
   function writeRoomToUrl(code: string) {
     if (typeof window === 'undefined') return
@@ -284,10 +348,7 @@ function App() {
                 value={roomCodeInput}
                 onChange={(event) =>
                   setRoomCodeInput(
-                    normalizeRoomCode(event.target.value).slice(
-                      0,
-                      ROOM_CODE_LENGTH,
-                    ),
+                    normalizeRoomCode(event.target.value).slice(0, ROOM_CODE_LENGTH),
                   )
                 }
               />
@@ -298,7 +359,9 @@ function App() {
                   !isValidRoomCode(normalizedRoomInput)
                 }
                 onClick={() => {
-                  const roomCode = normalizedRoomInput.slice(0, ROOM_CODE_LENGTH)
+                  const roomCode = isSoloTestRoomCode(normalizedRoomInput)
+                    ? SOLO_TEST_ROOM_CODE
+                    : normalizedRoomInput.slice(0, ROOM_CODE_LENGTH)
                   const identityNext = createIdentity(displayName.trim())
                   setEntry({
                     ready: true,
@@ -316,6 +379,9 @@ function App() {
                   Shared room detected: <strong>{deepLinkRoomCode}</strong>
                 </p>
               ) : null}
+              <p className="text-xs text-slate-500">
+                Solo test shortcut: enter <strong>{SOLO_TEST_ROOM_CODE}</strong> to auto-add 4 bots.
+              </p>
             </div>
           </Section>
         </div>
@@ -442,15 +508,11 @@ function App() {
                             })
                           }}
                         />
-                        {optionalRolePortraitByKey[key] ? (
-                          <img
-                            src={getRolePortrait(optionalRolePortraitByKey[key])}
-                            alt=""
-                            className="h-8 w-8 rounded-md border border-slate-700 object-cover"
-                          />
-                        ) : (
-                          <div className="h-8 w-8 rounded-md border border-slate-700 bg-slate-800/80" />
-                        )}
+                        <img
+                          src={optionalRoleIconByKey[key]}
+                          alt=""
+                          className="h-8 w-8 rounded-md border border-slate-700 object-cover"
+                        />
                         <span>{label}</span>
                       </label>
                     ))}
@@ -597,7 +659,13 @@ function App() {
 
                   <button
                     className="w-full rounded-lg bg-emerald-400 px-4 py-3 font-semibold text-slate-950"
-                    onClick={() => dispatch({ type: 'propose_team', actorId: identity.actorId, team: teamDraft })}
+                    onClick={() =>
+                      dispatch({
+                        type: 'propose_team',
+                        actorId: isSoloTestRoom && leaderId ? leaderId : identity.actorId,
+                        team: teamDraft,
+                      })
+                    }
                   >
                     Submit Team
                   </button>

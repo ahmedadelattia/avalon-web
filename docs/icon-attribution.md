@@ -18,6 +18,10 @@ Files used in this project:
 - `oberon.webp` from `roles/oberon.webp`
 - `minion.webp` from `roles/minion.webp`
 
+## Feature Portraits (`public/icons/features/*.webp`)
+
+- `lady_of_lake.webp` from `features/lady_of_lake.webp`
+
 ## Status Icons (`public/icons/status/*.svg`)
 
 Status icons were sourced from **Bootstrap Icons** under the **MIT License**:
