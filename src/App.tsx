@@ -39,6 +39,123 @@ function Section({
   )
 }
 
+function QuestTrack({
+  outcomes,
+  currentQuest,
+}: {
+  outcomes: Array<{ success: boolean }>
+  currentQuest: number
+}) {
+  return (
+    <div className="rounded-2xl border border-amber-800/40 bg-slate-900/70 p-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-amber-300">
+        Quest Track
+      </p>
+      <div className="mt-2 grid grid-cols-5 gap-2">
+        {Array.from({ length: 5 }, (_, idx) => {
+          const questNum = idx + 1
+          const done = idx < outcomes.length
+          const outcome = outcomes[idx]
+          const icon = done
+            ? outcome.success
+              ? '/icons/status/pass.svg'
+              : '/icons/status/fail.svg'
+            : '/icons/status/pending.svg'
+          const label = done ? (outcome.success ? 'Pass' : 'Fail') : 'Pending'
+          const isCurrent = !done && questNum === currentQuest
+          return (
+            <div
+              key={questNum}
+              className={`rounded-xl border p-2 text-center ${
+                isCurrent
+                  ? 'border-amber-400 bg-amber-400/10'
+                  : 'border-slate-700 bg-slate-950/50'
+              }`}
+            >
+              <p className="text-[10px] uppercase tracking-wide text-slate-400">
+                Q{questNum}
+              </p>
+              <img
+                src={icon}
+                alt={label}
+                className="mx-auto mt-1 h-8 w-8 rounded-md border border-slate-700 bg-slate-900 p-1"
+              />
+              <p className="mt-1 text-[10px] text-slate-300">{label}</p>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function RoundTable({
+  players,
+  teamIds,
+  leaderId,
+  highlightIds,
+}: {
+  players: Array<{
+    actorId: string
+    displayName: string
+    connected: boolean
+  }>
+  teamIds: string[]
+  leaderId: string | null
+  highlightIds: string[]
+}) {
+  const radius = 38
+  const center = 50
+  return (
+    <div className="rounded-2xl border border-slate-700 bg-slate-900/70 p-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-amber-300">
+        Round Table
+      </p>
+      <div className="relative mx-auto mt-4 aspect-square w-full max-w-[21rem] rounded-full border-2 border-amber-900/40 bg-[radial-gradient(circle,#0f172a,#020617)]">
+        <div className="absolute inset-[22%] rounded-full border border-slate-700 bg-slate-950/40" />
+        {players.map((player, index) => {
+          const angle = (index / players.length) * Math.PI * 2 - Math.PI / 2
+          const x = center + radius * Math.cos(angle)
+          const y = center + radius * Math.sin(angle)
+          const onTeam = teamIds.includes(player.actorId)
+          const isLeader = leaderId === player.actorId
+          const highlighted = highlightIds.includes(player.actorId)
+          return (
+            <div
+              key={player.actorId}
+              className="absolute -translate-x-1/2 -translate-y-1/2"
+              style={{ left: `${x}%`, top: `${y}%` }}
+            >
+              <div
+                className={`w-20 rounded-lg border px-2 py-1 text-center text-[11px] ${
+                  highlighted
+                    ? 'border-amber-300 bg-amber-300/20'
+                    : onTeam
+                      ? 'border-emerald-400 bg-emerald-400/15'
+                      : 'border-slate-700 bg-slate-950/70'
+                }`}
+              >
+                <p className="truncate font-semibold text-slate-100">
+                  {player.displayName}
+                </p>
+                <p className="text-[10px] text-slate-400">
+                  {isLeader
+                    ? 'Leader'
+                    : !player.connected
+                      ? 'Offline'
+                      : onTeam
+                        ? 'On Team'
+                        : 'Player'}
+                </p>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 type RoomEntry =
   | { ready: false }
   | {
@@ -209,6 +326,18 @@ function App() {
   const canStart = Boolean(PLAYER_MATRIX[playerCount])
   const canPlayFail =
     myRole?.alignment === 'evil' || state.room.houseRules.allowGoodFail
+  const isGameplayPhase =
+    state.phase !== 'lobby' && state.phase !== 'private_reveal'
+
+  const visiblePlayerIds = myVisibility
+    ? [...myVisibility.seesEvilIds, ...myVisibility.seesMerlinOrMorganaIds]
+    : []
+  const visiblePlayerNames = visiblePlayerIds
+    .map(
+      (id) =>
+        state.players.find((player) => player.actorId === id)?.displayName ?? id,
+    )
+    .filter((name, index, arr) => arr.indexOf(name) === index)
 
   return (
     <main className="mx-auto min-h-dvh max-w-xl bg-[radial-gradient(circle_at_top,#172554,transparent_65%),linear-gradient(180deg,#020617,#0f172a)] px-4 py-6 text-slate-100">
@@ -231,14 +360,28 @@ function App() {
           </div>
         </header>
 
-        {myRole &&
-        state.phase !== 'lobby' &&
-        state.phase !== 'private_reveal' ? (
-          <HoldToRevealButton
-            roleLabel={roleLabel(myRole.role)}
-            alignmentLabel={myRole.alignment.toUpperCase()}
-            power={getRolePowerText(myRole.role)}
-          />
+        {isGameplayPhase ? (
+          <>
+            <QuestTrack
+              outcomes={state.round.questOutcomes}
+              currentQuest={state.round.questNumber}
+            />
+            <RoundTable
+              players={state.players}
+              teamIds={state.round.proposedTeam}
+              leaderId={leaderId}
+              highlightIds={visiblePlayerIds}
+            />
+            {myRole ? (
+              <HoldToRevealButton
+                roleKey={myRole.role}
+                roleLabel={roleLabel(myRole.role)}
+                alignmentLabel={myRole.alignment.toUpperCase()}
+                power={getRolePowerText(myRole.role)}
+                visiblePlayers={visiblePlayerNames}
+              />
+            ) : null}
+          </>
         ) : null}
 
         {state.phase === 'lobby' ? (
