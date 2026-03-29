@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import type { RolePowerText } from '../lib/types'
+import { getRolePortrait } from '../lib/roleAssets'
+import type { Role, RolePowerText } from '../lib/types'
 
 interface Props {
-  roleKey: string
+  roleKey: Role
   roleLabel: string
   alignmentLabel: string
   power: RolePowerText
@@ -32,9 +33,9 @@ export function HoldToRevealButton({
         <div className="mt-3 rounded-lg bg-slate-950/80 p-3 text-sm">
           <div className="flex items-center gap-3">
             <img
-              src={`/icons/roles/${roleKey}.svg`}
+              src={getRolePortrait(roleKey)}
               alt=""
-              className="h-10 w-10 rounded-md border border-slate-700 bg-slate-900 p-1"
+              className="h-14 w-14 rounded-md border border-amber-700/70 bg-slate-900 object-cover"
             />
             <div>
               <p className="text-xs uppercase tracking-wide text-slate-400">Role</p>

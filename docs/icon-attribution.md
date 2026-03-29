@@ -1,39 +1,29 @@
 # Icon Attribution
 
-These icons were sourced from **Bootstrap Icons** and are licensed under the **MIT License**.
+## Role Portraits (`public/icons/roles/*.webp`)
+
+Portrait-style role images were sourced from Avalon wiki artwork hosted at:
+
+- Source site: https://avalon-game.com/wiki/roles/
+- Asset host: https://storage.yandexcloud.net/avalon-game/images/roles/
+
+Files used in this project:
+
+- `merlin.webp` from `roles/merlin.webp`
+- `percival.webp` from `roles/percival.webp`
+- `loyal_servant.webp` from `roles/servant.webp`
+- `assassin.webp` from `roles/troublemaker.webp` (visual stand-in with matching art style)
+- `morgana.webp` from `roles/morgana.webp`
+- `mordred.webp` from `roles/mordred.webp`
+- `oberon.webp` from `roles/oberon.webp`
+- `minion.webp` from `roles/minion.webp`
+
+## Status Icons (`public/icons/status/*.svg`)
+
+Status icons were sourced from **Bootstrap Icons** under the **MIT License**:
 
 - Upstream project: https://github.com/twbs/icons
 - License: https://github.com/twbs/icons/blob/main/LICENSE.md
-
-## Role Icons (`public/icons/roles`)
-
-- `merlin.svg`  
-  Source: https://raw.githubusercontent.com/twbs/icons/main/icons/magic.svg
-- `percival.svg`  
-  Source: https://raw.githubusercontent.com/twbs/icons/main/icons/eye-fill.svg
-- `loyal_servant.svg`  
-  Source: https://raw.githubusercontent.com/twbs/icons/main/icons/person-fill.svg
-- `assassin.svg`  
-  Source: https://raw.githubusercontent.com/twbs/icons/main/icons/person-fill-slash.svg
-- `morgana.svg`  
-  Source: https://raw.githubusercontent.com/twbs/icons/main/icons/mask.svg
-- `mordred.svg`  
-  Source: https://raw.githubusercontent.com/twbs/icons/main/icons/shield-fill-x.svg
-- `oberon.svg`  
-  Source: https://raw.githubusercontent.com/twbs/icons/main/icons/incognito.svg
-- `minion.svg`  
-  Source: https://raw.githubusercontent.com/twbs/icons/main/icons/people-fill.svg
-
-## Status Icons (`public/icons/status`)
-
-- `pass.svg`  
-  Source: https://raw.githubusercontent.com/twbs/icons/main/icons/check-circle-fill.svg
-- `fail.svg`  
-  Source: https://raw.githubusercontent.com/twbs/icons/main/icons/x-circle-fill.svg
-- `pending.svg`  
-  Source: https://raw.githubusercontent.com/twbs/icons/main/icons/dash-circle.svg
-
-## Notes
-
-- All downloaded SVGs were optimized with `svgo` after download.
-- MIT license is permissive and generally does not require attribution in-app, but this file records provenance for compliance/audit purposes.
+- `pass.svg` from `icons/check-circle-fill.svg`
+- `fail.svg` from `icons/x-circle-fill.svg`
+- `pending.svg` from `icons/dash-circle.svg`

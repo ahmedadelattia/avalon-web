@@ -16,9 +16,10 @@ import {
   ROOM_CODE_LENGTH,
 } from './lib/room'
 import { getRolePowerText, getQuestTeamSize, PLAYER_MATRIX } from './lib/rules'
+import { getRolePortrait } from './lib/roleAssets'
 import { createIdentity, getStoredName } from './lib/storage'
 import { currentTimeMs } from './lib/time'
-import type { EngineAction, PlayerIdentity } from './lib/types'
+import type { EngineAction, PlayerIdentity, Role } from './lib/types'
 import { useRoomSync } from './hooks/useRoomSync'
 
 type WithoutNow<T> = T extends { now: number } ? Omit<T, 'now'> : never
@@ -166,6 +167,14 @@ type RoomEntry =
     }
 
 function App() {
+  const optionalRolePortraitByKey: Record<string, Role | null> = {
+    mordred: 'mordred',
+    oberon: 'oberon',
+    morgana: 'morgana',
+    percival: 'percival',
+    ladyOfTheLake: null,
+  }
+
   const deepLinkRoomCode = useMemo(() => {
     if (typeof window === 'undefined') return null
     return extractRoomCodeFromLocation(window.location)
@@ -408,10 +417,10 @@ function App() {
               {state.hostActorId === identity.actorId ? (
                 <div className="space-y-3 rounded-xl border border-slate-700 bg-slate-950/40 p-3">
                   <p className="text-xs uppercase tracking-wide text-slate-400">Role Toggles</p>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    {(
-                      [
-                        ['mordred', 'Mordred'],
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {(
+                    [
+                      ['mordred', 'Mordred'],
                         ['oberon', 'Oberon'],
                         ['morgana', 'Morgana'],
                         ['percival', 'Percival'],
@@ -433,6 +442,15 @@ function App() {
                             })
                           }}
                         />
+                        {optionalRolePortraitByKey[key] ? (
+                          <img
+                            src={getRolePortrait(optionalRolePortraitByKey[key])}
+                            alt=""
+                            className="h-8 w-8 rounded-md border border-slate-700 object-cover"
+                          />
+                        ) : (
+                          <div className="h-8 w-8 rounded-md border border-slate-700 bg-slate-800/80" />
+                        )}
                         <span>{label}</span>
                       </label>
                     ))}
