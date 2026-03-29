@@ -142,6 +142,7 @@ function RoundTable({
   onPlayerClick,
   selectableHint = 'Tap to Add',
   statusByActorId = {},
+  statusToneByActorId = {},
 }: {
   players: Array<{
     actorId: string
@@ -156,6 +157,7 @@ function RoundTable({
   onPlayerClick?: (actorId: string) => void
   selectableHint?: string
   statusByActorId?: Record<string, string>
+  statusToneByActorId?: Record<string, 'good' | 'evil'>
 }) {
   const radius = 38
   const center = 50
@@ -176,6 +178,7 @@ function RoundTable({
           const isSelectable = selectableActorIds.includes(player.actorId)
           const isDisabled = disabledActorIds.includes(player.actorId)
           const interactive = Boolean(onPlayerClick && isSelectable)
+          const statusTone = statusToneByActorId[player.actorId]
           return (
             <div
               key={player.actorId}
@@ -206,7 +209,15 @@ function RoundTable({
                 <p className="truncate text-[10px] font-semibold text-slate-100">
                   {player.displayName}
                 </p>
-                <p className="text-[10px] text-slate-400">
+                <p
+                  className={`text-[10px] ${
+                    statusTone === 'good'
+                      ? 'text-emerald-300'
+                      : statusTone === 'evil'
+                        ? 'text-rose-300'
+                        : 'text-slate-400'
+                  }`}
+                >
                   {statusByActorId[player.actorId]
                     ? statusByActorId[player.actorId]
                     : isLeader
@@ -298,8 +309,6 @@ function App() {
     if (!state || !identity || !state.visibility) return null
     return state.visibility.byActorId[identity.actorId] ?? null
   }, [identity, state])
-
-  const connectedPlayers = state?.players.filter((p) => p.connected).length ?? 0
 
   const leaderId = state ? leaderActorId(state) : null
   const isLeader = Boolean(identity && leaderId === identity.actorId)
@@ -527,35 +536,33 @@ function App() {
       : isRevealOpen
         ? revealHighlightIds
         : []
+  const endgameRoleLabelByActorId: Record<string, string> =
+    state.phase === 'game_end'
+      ? Object.fromEntries(
+          state.assignments.map((assignment) => [
+            assignment.actorId,
+            roleLabel(assignment.role),
+          ]),
+        )
+      : {}
+  const endgameRoleToneByActorId: Record<string, 'good' | 'evil'> =
+    state.phase === 'game_end'
+      ? Object.fromEntries(
+          state.assignments.map((assignment) => [
+            assignment.actorId,
+            assignment.alignment,
+          ]),
+        )
+      : {}
 
   return (
     <main className="mx-auto min-h-dvh max-w-xl bg-[radial-gradient(circle_at_top,#172554,transparent_65%),linear-gradient(180deg,#020617,#0f172a)] px-4 py-6 text-slate-100">
       <div className="space-y-4">
-        <header className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-amber-300">Room</p>
-              <p className="text-2xl font-black tracking-wider">{state.room.roomCode}</p>
-            </div>
-            <div className="text-right text-xs text-slate-400">
-              <div className="mb-2 flex justify-end">
-                <InviteTools roomCode={state.room.roomCode} />
-              </div>
-              <p>{sync.transportText}</p>
-              <p>{connectedPlayers}/{state.players.length} connected</p>
-              <p>Host epoch {state.hostEpoch}</p>
-            </div>
-          </div>
-          {sync.error ? <p className="mt-2 text-xs text-rose-300">{sync.error}</p> : null}
-        </header>
-
-        {state.phase !== 'lobby' && state.phase !== 'private_reveal' ? (
-          <QuestTrack
-            outcomes={state.round.questOutcomes}
-            currentQuest={state.round.questNumber}
-            playerCount={state.players.length}
-          />
-        ) : null}
+        <InviteTools
+          roomCode={state.room.roomCode}
+          variant="floating"
+          floatingTopClass="top-[36%]"
+        />
 
         <RoundTable
           players={sortedPlayers}
@@ -582,9 +589,14 @@ function App() {
             state.phase === 'assassination' ? 'Tap to Nominate' : 'Tap to Add'
           }
           statusByActorId={
-            state.phase === 'assassination' && state.assassination?.suspectId
-              ? { [state.assassination.suspectId]: 'Suspect' }
-              : {}
+            state.phase === 'game_end'
+              ? endgameRoleLabelByActorId
+              : state.phase === 'assassination' && state.assassination?.suspectId
+                ? { [state.assassination.suspectId]: 'Suspect' }
+                : {}
+          }
+          statusToneByActorId={
+            state.phase === 'game_end' ? endgameRoleToneByActorId : {}
           }
           onPlayerClick={(actorId) => {
             if (canInteractWithRoundTable) {
@@ -611,6 +623,16 @@ function App() {
           }}
         />
 
+        {sync.error ? <p className="text-xs text-rose-300">{sync.error}</p> : null}
+
+        {state.phase !== 'lobby' && state.phase !== 'private_reveal' ? (
+          <QuestTrack
+            outcomes={state.round.questOutcomes}
+            currentQuest={state.round.questNumber}
+            playerCount={state.players.length}
+          />
+        ) : null}
+
         {state.phase !== 'lobby' && state.phase !== 'private_reveal' ? (
           myRole ? (
             <HoldToRevealButton
@@ -622,6 +644,7 @@ function App() {
               open={isRevealOpen}
               onOpenChange={setIsRevealOpen}
               variant="floating"
+              floatingTopClass="top-[64%]"
             />
           ) : null
         ) : null}
@@ -634,18 +657,6 @@ function App() {
                   ? `${playerCount} players ready. Avalon supports 5 to 10 players.`
                   : `Need 5-10 players. Current: ${playerCount}`}
               </p>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                {state.players.map((player) => (
-                  <div
-                    key={player.actorId}
-                    className="rounded-lg border border-slate-700 bg-slate-950/60 px-2 py-2"
-                  >
-                    <p className="font-semibold text-slate-200">{player.displayName}</p>
-                    <p className="text-slate-400">{player.connected ? 'Online' : 'Offline'}</p>
-                    <p className="text-amber-300">{player.isHost ? 'Host' : `Seat ${player.joinOrder + 1}`}</p>
-                  </div>
-                ))}
-              </div>
 
               {state.hostActorId === identity.actorId ? (
                 <div className="space-y-3 rounded-xl border border-slate-700 bg-slate-950/40 p-3">
@@ -797,11 +808,6 @@ function App() {
 
               {isLeader ? (
                 <div className="space-y-2">
-                  <p className="text-xs text-slate-400">
-                    Tap players on the round table to choose the quest team.
-                    Selected: {teamDraft.length}/{teamSizeRequired}
-                  </p>
-
                   <button
                     className="w-full rounded-lg bg-emerald-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-40"
                     disabled={teamDraft.length !== teamSizeRequired}
@@ -1013,14 +1019,6 @@ function App() {
                 {state.winner === 'good' ? 'Good Wins' : 'Evil Wins'}
               </p>
               <p className="text-sm text-slate-300">{state.winningReason}</p>
-              <div className="rounded-lg bg-slate-950/60 p-3 text-xs text-slate-300">
-                {state.assignments.map((assignment) => (
-                  <p key={assignment.actorId}>
-                    {state.players.find((p) => p.actorId === assignment.actorId)?.displayName}:{' '}
-                    {roleLabel(assignment.role)} ({assignment.alignment})
-                  </p>
-                ))}
-              </div>
             </div>
           </Section>
         ) : null}

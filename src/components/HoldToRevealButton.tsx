@@ -13,6 +13,7 @@ interface Props {
   open?: boolean
   onOpenChange?: (open: boolean) => void
   variant?: 'inline' | 'floating'
+  floatingTopClass?: string
 }
 
 export function HoldToRevealButton({
@@ -25,6 +26,7 @@ export function HoldToRevealButton({
   open,
   onOpenChange,
   variant = 'inline',
+  floatingTopClass = 'top-[62%]',
 }: Props) {
   const [internalOpen, setInternalOpen] = useState(false)
   const isOpen = open ?? internalOpen
@@ -63,7 +65,7 @@ export function HoldToRevealButton({
 
   if (variant === 'floating') {
     return (
-      <div className="fixed right-0 top-1/2 z-50 -translate-y-1/2">
+      <div className={`fixed right-0 z-[55] -translate-y-1/2 ${floatingTopClass}`}>
         {!isOpen ? (
           <button
             type="button"
