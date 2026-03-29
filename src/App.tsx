@@ -7,7 +7,12 @@ import {
   leaderActorId,
   roleLabel,
 } from './lib/engine'
-import { randomRoomCode } from './lib/room'
+import {
+  isValidRoomCode,
+  normalizeRoomCode,
+  randomRoomCode,
+  ROOM_CODE_LENGTH,
+} from './lib/room'
 import { getRolePowerText, getQuestTeamSize, PLAYER_MATRIX } from './lib/rules'
 import { createIdentity, getStoredName } from './lib/storage'
 import { currentTimeMs } from './lib/time'
@@ -47,6 +52,10 @@ function App() {
   const [entry, setEntry] = useState<RoomEntry>({ ready: false })
   const [teamDraft, setTeamDraft] = useState<string[]>([])
   const localIdentity = useMemo(() => createIdentity('Local Player'), [])
+  const normalizedRoomInput = useMemo(
+    () => normalizeRoomCode(roomCodeInput),
+    [roomCodeInput],
+  )
 
   const sync = useRoomSync(
     entry.ready
@@ -130,16 +139,26 @@ function App() {
                 className="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 uppercase"
                 placeholder="Room code"
                 value={roomCodeInput}
-                onChange={(event) => setRoomCodeInput(event.target.value.toUpperCase())}
+                onChange={(event) =>
+                  setRoomCodeInput(
+                    normalizeRoomCode(event.target.value).slice(
+                      0,
+                      ROOM_CODE_LENGTH,
+                    ),
+                  )
+                }
               />
               <button
                 className="w-full rounded-xl bg-amber-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-40"
-                disabled={displayName.trim().length < 2 || roomCodeInput.trim().length !== 6}
+                disabled={
+                  displayName.trim().length < 2 ||
+                  !isValidRoomCode(normalizedRoomInput)
+                }
                 onClick={() => {
                   const identityNext = createIdentity(displayName.trim())
                   setEntry({
                     ready: true,
-                    roomCode: roomCodeInput.trim().toUpperCase(),
+                    roomCode: normalizedRoomInput.slice(0, ROOM_CODE_LENGTH),
                     identity: identityNext,
                     isCreator: false,
                   })

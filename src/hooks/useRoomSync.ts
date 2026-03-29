@@ -24,8 +24,9 @@ type TransportStatus =
   | 'reconnecting'
 
 export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
+  const shouldBootstrapLocalState = isCreator || !hasSupabaseConfig
   const [state, setState] = useState<GameState | null>(() =>
-    isCreator ? createInitialState(roomCode, identity) : null,
+    shouldBootstrapLocalState ? createInitialState(roomCode, identity) : null,
   )
   const [status, setStatus] = useState<TransportStatus>(
     hasSupabaseConfig ? 'connecting' : 'offline_local',
@@ -38,6 +39,23 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
   useEffect(() => {
     stateRef.current = state
   }, [state])
+
+  useEffect(() => {
+    const nextState = shouldBootstrapLocalState
+      ? createInitialState(roomCode, identity)
+      : null
+    stateRef.current = nextState
+    setState(nextState)
+    appliedActionIds.current = new Set()
+    setError(null)
+    setStatus(hasSupabaseConfig ? 'connecting' : 'offline_local')
+  }, [
+    identity.actorId,
+    identity.displayName,
+    isCreator,
+    roomCode,
+    shouldBootstrapLocalState,
+  ])
 
   const applyActionLocal = useCallback((action: EngineAction): GameState | null => {
     const current = stateRef.current
