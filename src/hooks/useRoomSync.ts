@@ -35,6 +35,7 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
 
   const stateRef = useRef<GameState | null>(state)
   const appliedActionIds = useRef<Set<string>>(new Set())
+  const channelRef = useRef<ReturnType<NonNullable<typeof supabase>['channel']> | null>(null)
 
   useEffect(() => {
     stateRef.current = state
@@ -56,6 +57,25 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
     roomCode,
     shouldBootstrapLocalState,
   ])
+
+  const sendBroadcast = useCallback(
+    async (event: 'intent' | 'commit' | 'system', payload: unknown) => {
+      const channel = channelRef.current
+      if (!channel) {
+        setError('Channel not ready yet. Please retry.')
+        return
+      }
+      const response = await channel.send({
+        type: 'broadcast',
+        event,
+        payload,
+      })
+      if (response !== 'ok') {
+        setError(`Realtime send failed (${response}). Retrying...`)
+      }
+    },
+    [],
+  )
 
   const applyActionLocal = useCallback((action: EngineAction): GameState | null => {
     const current = stateRef.current
@@ -112,13 +132,9 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
         next,
       )
 
-      await supabase.channel(`room:${roomCode}`).send({
-        type: 'broadcast',
-        event: 'commit',
-        payload: commit,
-      })
+      await sendBroadcast('commit', commit)
     },
-    [applyActionLocal, identity.actorId, roomCode],
+    [applyActionLocal, identity.actorId, roomCode, sendBroadcast],
   )
 
   const dispatch = useCallback(
@@ -140,13 +156,9 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
         return
       }
 
-      await supabase.channel(`room:${roomCode}`).send({
-        type: 'broadcast',
-        event: 'intent',
-        payload: intent,
-      })
+      await sendBroadcast('intent', intent)
     },
-    [applyActionLocal, identity.actorId, maybeCommitAsHost, roomCode],
+    [applyActionLocal, identity.actorId, maybeCommitAsHost, roomCode, sendBroadcast],
   )
 
   useEffect(() => {
@@ -160,6 +172,7 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
         },
       },
     })
+    channelRef.current = channel
 
     channel
       .on('presence', { event: 'sync' }, async () => {
@@ -194,11 +207,7 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
               sentAt: Date.now(),
               hostEpoch: current.hostEpoch + 1,
             }
-            await channel.send({
-              type: 'broadcast',
-              event: 'system',
-              payload: event,
-            })
+            await sendBroadcast('system', event)
 
             const migrated = reduceGameState(current, {
               type: 'set_host',
@@ -263,28 +272,23 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
             }
             await maybeCommitAsHost('creator-join', joinAction)
           } else {
-            await channel.send({
-              type: 'broadcast',
-              event: 'intent',
-              payload: toIntent(roomCode, identity.actorId, 'lobby', {
+            await sendBroadcast(
+              'intent',
+              toIntent(roomCode, identity.actorId, 'lobby', {
                 type: 'player_join',
                 actorId: identity.actorId,
                 displayName: identity.displayName,
                 now: Date.now(),
               }),
-            })
+            )
 
-            await channel.send({
-              type: 'broadcast',
-              event: 'system',
-              payload: {
-                type: 'resync_requested',
-                roomCode,
-                holderId: identity.actorId,
-                sentAt: Date.now(),
-                hostEpoch: stateRef.current?.hostEpoch ?? 1,
-              } satisfies SystemEvent,
-            })
+            await sendBroadcast('system', {
+              type: 'resync_requested',
+              roomCode,
+              holderId: identity.actorId,
+              sentAt: Date.now(),
+              hostEpoch: stateRef.current?.hostEpoch ?? 1,
+            } satisfies SystemEvent)
           }
         } else if (channelStatus === 'CHANNEL_ERROR') {
           setStatus('reconnecting')
@@ -312,16 +316,13 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
           current,
         )
 
-        await channel.send({
-          type: 'broadcast',
-          event: 'commit',
-          payload: commit,
-        })
+        await sendBroadcast('commit', commit)
       }
     })
 
     return () => {
       cancelled = true
+      channelRef.current = null
       channel.unsubscribe()
     }
   }, [
@@ -331,6 +332,7 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
     isCreator,
     maybeCommitAsHost,
     roomCode,
+    sendBroadcast,
   ])
 
   const transportText = useMemo(() => {
