@@ -100,6 +100,7 @@ function RoundTable({
   selectableActorIds = [],
   disabledActorIds = [],
   onPlayerClick,
+  selectableHint = 'Tap to Add',
 }: {
   players: Array<{
     actorId: string
@@ -112,6 +113,7 @@ function RoundTable({
   selectableActorIds?: string[]
   disabledActorIds?: string[]
   onPlayerClick?: (actorId: string) => void
+  selectableHint?: string
 }) {
   const radius = 38
   const center = 50
@@ -120,7 +122,7 @@ function RoundTable({
       <p className="text-xs font-semibold uppercase tracking-[0.15em] text-amber-300">
         Round Table
       </p>
-      <div className="relative mx-auto mt-4 aspect-square w-full max-w-[21rem] rounded-full border-2 border-amber-900/40 bg-[radial-gradient(circle,#0f172a,#020617)]">
+      <div className="relative mx-auto mt-4 aspect-square w-full max-w-[21rem] rounded-full border-2 border-slate-600/80 bg-[radial-gradient(circle,#0f172a,#020617)]">
         <div className="absolute inset-[22%] rounded-full border border-slate-700 bg-slate-950/40" />
         {players.map((player, index) => {
           const angle = (index / players.length) * Math.PI * 2 - Math.PI / 2
@@ -147,7 +149,7 @@ function RoundTable({
                 }}
                 className={`w-20 rounded-lg border px-2 py-1 text-center text-[11px] ${
                   highlighted
-                    ? 'border-amber-300 bg-amber-300/20'
+                    ? 'border-rose-400 bg-rose-500/20'
                     : onTeam
                       ? 'border-emerald-400 bg-emerald-400/15'
                       : 'border-slate-700 bg-slate-950/70'
@@ -170,7 +172,7 @@ function RoundTable({
                       : onTeam
                         ? 'On Team'
                         : isSelectable
-                          ? 'Tap to Add'
+                          ? selectableHint
                         : 'Player'}
                 </p>
               </button>
@@ -409,9 +411,6 @@ function App() {
                   Shared room detected: <strong>{deepLinkRoomCode}</strong>
                 </p>
               ) : null}
-              <p className="text-xs text-slate-500">
-                Solo test shortcut: enter <strong>{SOLO_TEST_ROOM_CODE}</strong> to auto-add 4 bots.
-              </p>
             </div>
           </Section>
         </div>
@@ -431,17 +430,27 @@ function App() {
   const canStart = Boolean(PLAYER_MATRIX[playerCount])
   const canPlayFail =
     myRole?.alignment === 'evil' || state.room.houseRules.allowGoodFail
-  const isGameplayPhase =
-    state.phase !== 'lobby' && state.phase !== 'private_reveal'
+  const sortedPlayers = [...state.players].sort((a, b) => a.joinOrder - b.joinOrder)
   const teamSizeRequired = PLAYER_MATRIX[state.players.length]
     ? getQuestTeamSize(state.players.length, state.round.questNumber)
     : 0
   const canInteractWithRoundTable = state.phase === 'team_proposal' && isLeader
+  const isAssassin = state.assassination?.assassinId === identity.actorId
+  const assassinationTargetIds =
+    state.phase === 'assassination'
+      ? sortedPlayers
+          .filter((player) => actorRole(state, player.actorId)?.alignment === 'good')
+          .map((player) => player.actorId)
+      : []
   const roundTableTeamIds =
-    state.phase === 'team_proposal' ? teamDraft : state.round.proposedTeam
+    state.phase === 'team_proposal'
+      ? teamDraft
+      : state.phase === 'assassination' && state.assassination?.suspectId
+        ? [state.assassination.suspectId]
+        : state.round.proposedTeam
   const teamDraftLimitReached = teamDraft.length >= teamSizeRequired
   const roundTableDisabledIds = canInteractWithRoundTable
-    ? state.players
+    ? sortedPlayers
         .filter((player) => !teamDraft.includes(player.actorId) && teamDraftLimitReached)
         .map((player) => player.actorId)
     : []
@@ -455,6 +464,9 @@ function App() {
         state.players.find((player) => player.actorId === id)?.displayName ?? id,
     )
     .filter((name, index, arr) => arr.indexOf(name) === index)
+  const revealHighlightIds = myVisibility?.seesEvilIds ?? []
+  const roundTableHighlightIds =
+    state.phase === 'private_reveal' ? revealHighlightIds : visiblePlayerIds
 
   return (
     <main className="mx-auto min-h-dvh max-w-xl bg-[radial-gradient(circle_at_top,#172554,transparent_65%),linear-gradient(180deg,#020617,#0f172a)] px-4 py-6 text-slate-100">
@@ -477,42 +489,72 @@ function App() {
           </div>
         </header>
 
-        {isGameplayPhase ? (
-          <>
-            <QuestTrack
-              outcomes={state.round.questOutcomes}
-              currentQuest={state.round.questNumber}
+        {state.phase !== 'lobby' && state.phase !== 'private_reveal' ? (
+          <QuestTrack
+            outcomes={state.round.questOutcomes}
+            currentQuest={state.round.questNumber}
+          />
+        ) : null}
+
+        <RoundTable
+          players={sortedPlayers}
+          teamIds={roundTableTeamIds}
+          leaderId={leaderId}
+          highlightIds={roundTableHighlightIds}
+          selectableActorIds={
+            canInteractWithRoundTable
+              ? sortedPlayers.map((p) => p.actorId)
+              : state.phase === 'assassination' && isAssassin
+                ? assassinationTargetIds
+                : []
+          }
+          disabledActorIds={
+            canInteractWithRoundTable
+              ? roundTableDisabledIds
+              : state.phase === 'assassination' && isAssassin
+                ? sortedPlayers
+                    .filter((player) => !assassinationTargetIds.includes(player.actorId))
+                    .map((player) => player.actorId)
+                : []
+          }
+          selectableHint={
+            state.phase === 'assassination' ? 'Tap to Nominate' : 'Tap to Add'
+          }
+          onPlayerClick={(actorId) => {
+            if (canInteractWithRoundTable) {
+              setTeamDraft((prev) => {
+                if (prev.includes(actorId)) {
+                  return prev.filter((id) => id !== actorId)
+                }
+                if (prev.length >= teamSizeRequired) {
+                  return prev
+                }
+                return [...prev, actorId]
+              })
+              return
+            }
+
+            if (state.phase === 'assassination' && isAssassin) {
+              if (!assassinationTargetIds.includes(actorId)) return
+              void dispatch({
+                type: 'assassination_nominate',
+                actorId: identity.actorId,
+                suspectId: actorId,
+              })
+            }
+          }}
+        />
+
+        {state.phase !== 'lobby' ? (
+          myRole ? (
+            <HoldToRevealButton
+              roleKey={myRole.role}
+              roleLabel={roleLabel(myRole.role)}
+              alignmentLabel={myRole.alignment.toUpperCase()}
+              power={getRolePowerText(myRole.role)}
+              visiblePlayers={visiblePlayerNames}
             />
-            <RoundTable
-              players={state.players}
-              teamIds={roundTableTeamIds}
-              leaderId={leaderId}
-              highlightIds={visiblePlayerIds}
-              selectableActorIds={canInteractWithRoundTable ? state.players.map((p) => p.actorId) : []}
-              disabledActorIds={roundTableDisabledIds}
-              onPlayerClick={(actorId) => {
-                if (!canInteractWithRoundTable) return
-                setTeamDraft((prev) => {
-                  if (prev.includes(actorId)) {
-                    return prev.filter((id) => id !== actorId)
-                  }
-                  if (prev.length >= teamSizeRequired) {
-                    return prev
-                  }
-                  return [...prev, actorId]
-                })
-              }}
-            />
-            {myRole ? (
-              <HoldToRevealButton
-                roleKey={myRole.role}
-                roleLabel={roleLabel(myRole.role)}
-                alignmentLabel={myRole.alignment.toUpperCase()}
-                power={getRolePowerText(myRole.role)}
-                visiblePlayers={visiblePlayerNames}
-              />
-            ) : null}
-          </>
+          ) : null
         ) : null}
 
         {state.phase === 'lobby' ? (
@@ -837,25 +879,9 @@ function App() {
               </p>
 
               {state.assassination?.assassinId === identity.actorId ? (
-                <div className="grid grid-cols-2 gap-2">
-                  {state.players
-                    .filter((p) => actorRole(state, p.actorId)?.alignment === 'good')
-                    .map((player) => (
-                      <button
-                        key={player.actorId}
-                        className="rounded-lg border border-slate-700 bg-slate-900/60 px-2 py-2 text-left"
-                        onClick={() =>
-                          dispatch({
-                            type: 'assassination_nominate',
-                            actorId: identity.actorId,
-                            suspectId: player.actorId,
-                          })
-                        }
-                      >
-                        Nominate {player.displayName}
-                      </button>
-                    ))}
-                </div>
+                <p className="text-xs text-slate-400">
+                  Tap a good player on the round table to nominate.
+                </p>
               ) : null}
 
               {state.assassination?.suspectId ? (
