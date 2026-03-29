@@ -81,7 +81,7 @@ function QuestTrack({
               <img
                 src={icon}
                 alt={label}
-                className="mx-auto mt-1 h-8 w-8 rounded-md border border-slate-700 bg-slate-900 p-1"
+                className="mx-auto mt-1 h-9 w-9"
               />
               <p className="mt-1 text-[10px] text-slate-300">{label}</p>
             </div>

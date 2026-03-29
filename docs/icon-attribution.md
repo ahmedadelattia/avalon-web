@@ -24,10 +24,10 @@ Files used in this project:
 
 ## Status Icons (`public/icons/status/*.svg`)
 
-Status icons were sourced from **Bootstrap Icons** under the **MIT License**:
+Status symbols are based on **Tabler Icons** (MIT License), then simplified in-file for this app:
 
-- Upstream project: https://github.com/twbs/icons
-- License: https://github.com/twbs/icons/blob/main/LICENSE.md
-- `pass.svg` from `icons/check-circle-fill.svg`
-- `fail.svg` from `icons/x-circle-fill.svg`
-- `pending.svg` from `icons/dash-circle.svg`
+- Upstream project: https://github.com/tabler/tabler-icons
+- License: https://github.com/tabler/tabler-icons/blob/main/LICENSE
+- `pass.svg` based on `icons/outline/check.svg`
+- `fail.svg` based on `icons/outline/x.svg`
+- `pending.svg` based on `icons/outline/circle.svg`
