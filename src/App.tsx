@@ -27,21 +27,47 @@ import { useRoomSync } from './hooks/useRoomSync'
 type WithoutNow<T> = T extends { now: number } ? Omit<T, 'now'> : never
 type EngineActionInput = WithoutNow<EngineAction>
 
-function Section({
-  title,
+// Shared parchment panel used for all game panels (votes, results, info sections).
+// Navy header band + warm parchment body + optional darker footer strip.
+function ParchmentPanel({
+  label,
   children,
+  footer,
 }: {
-  title: string
+  label: string
   children: ReactNode
+  footer?: ReactNode
 }) {
   return (
-    <section className="rounded-lg border border-slate-800 bg-slate-900 p-4">
-      <h2 className="text-xs font-medium text-slate-400">{title}</h2>
-      <div className="mt-3">{children}</div>
-    </section>
+    <div
+      className="overflow-hidden rounded border border-[#2d4a6a]"
+      style={{ boxShadow: '0 2px 12px rgba(0,0,0,0.4)' }}
+    >
+      <div className="bg-[#1a2d4a] px-4 py-2 text-center">
+        <span className="font-serif text-[11px] font-bold uppercase tracking-widest text-[#e8c8b0]">
+          {label}
+        </span>
+      </div>
+      <div className="bg-[#e8e0d0] px-4 py-4 text-[#1a1208]">{children}</div>
+      {footer ? (
+        <div className="bg-[#d4ccbe] px-4 py-2.5 text-center text-xs text-[#3a3a4a]">
+          {footer}
+        </div>
+      ) : null}
+    </div>
   )
 }
 
+// Alias kept for non-vote informational sections (same panel, thinner padding).
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <ParchmentPanel label={title}>
+      <div className="text-[#1e1408]">{children}</div>
+    </ParchmentPanel>
+  )
+}
+
+// Used for proposal_vote and quest_vote action panels.
 function ActionPanel({
   title,
   subtitle,
@@ -54,16 +80,12 @@ function ActionPanel({
   children: ReactNode
 }) {
   return (
-    <div className="overflow-hidden rounded-lg border border-slate-700 bg-slate-900">
-      <div className="border-b border-slate-800 px-4 py-3">
-        <h3 className="text-base font-semibold text-slate-100">{title}</h3>
-        {subtitle ? <p className="mt-0.5 text-sm text-slate-400">{subtitle}</p> : null}
-      </div>
-      <div className="px-4 py-5">{children}</div>
-      {footer ? (
-        <div className="border-t border-slate-800 px-4 py-3 text-sm text-slate-400">{footer}</div>
+    <ParchmentPanel label={title} footer={footer}>
+      {subtitle ? (
+        <p className="mb-4 text-center text-sm text-[#3a4a5a]">{subtitle}</p>
       ) : null}
-    </div>
+      {children}
+    </ParchmentPanel>
   )
 }
 
@@ -81,10 +103,10 @@ function VoteButton({
   disabled?: boolean
 }) {
   const styles = {
-    approve: 'border-emerald-700 bg-emerald-800 text-emerald-50 hover:bg-emerald-700',
-    reject: 'border-rose-800 bg-rose-900 text-rose-50 hover:bg-rose-800',
-    success: 'border-emerald-700 bg-emerald-800 text-emerald-50 hover:bg-emerald-700',
-    fail: 'border-rose-800 bg-rose-900 text-rose-50 hover:bg-rose-800',
+    approve: 'border-[#267238] bg-[#1c5226] text-white hover:bg-[#236030]',
+    reject:  'border-[#9a2828] bg-[#7a1a1a] text-[#f5d0d0] hover:bg-[#8a2020]',
+    success: 'border-[#267238] bg-[#1c5226] text-white hover:bg-[#236030]',
+    fail:    'border-[#9a2828] bg-[#7a1a1a] text-[#f5d0d0] hover:bg-[#8a2020]',
   } as const
 
   return (
@@ -92,37 +114,39 @@ function VoteButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className={`rounded-lg border px-4 py-5 transition-colors active:opacity-80 disabled:cursor-not-allowed disabled:opacity-40 ${styles[tone]}`}
+      className={`rounded border-2 px-4 py-5 transition-colors active:opacity-80 disabled:cursor-not-allowed disabled:opacity-40 ${styles[tone]}`}
     >
       <div className="flex flex-col items-center gap-2">
-        <span className="text-4xl leading-none">{icon}</span>
-        <span className="text-lg font-bold">{label}</span>
+        <span className="text-5xl leading-none">{icon}</span>
+        <span className="font-serif text-lg font-bold uppercase tracking-wide">{label}</span>
       </div>
     </button>
   )
 }
 
+// Large result icon displayed directly on parchment — no surrounding box.
 function ResultIcon({ success }: { success: boolean }) {
   return (
-    <div className="flex justify-center">
-      <div
-        className={`flex h-28 w-28 items-center justify-center rounded-xl border text-6xl ${
-          success
-            ? 'border-emerald-700 bg-emerald-900/60 text-emerald-300'
-            : 'border-rose-800 bg-rose-900/60 text-rose-300'
-        }`}
-      >
-        {success ? '✓' : '✕'}
-      </div>
+    <div className={`text-center text-8xl leading-none ${success ? 'text-[#267a32]' : 'text-[#8a1e1e]'}`}>
+      {success ? '✓' : '✕'}
     </div>
   )
 }
 
 function TeamResultPanel({ approved }: { approved: boolean }) {
   return (
-    <ActionPanel title={approved ? 'Team Approved' : 'Team Rejected'}>
-      <ResultIcon success={approved} />
-    </ActionPanel>
+    <ParchmentPanel label="Voting Result">
+      <div className="space-y-3 py-1 text-center">
+        <p
+          className={`font-serif text-2xl font-black uppercase tracking-wide ${
+            approved ? 'text-[#1a4a1e]' : 'text-[#6a1010]'
+          }`}
+        >
+          {approved ? 'Team Approved' : 'Team Rejected'}
+        </p>
+        <ResultIcon success={approved} />
+      </div>
+    </ParchmentPanel>
   )
 }
 
@@ -136,12 +160,19 @@ function QuestResultPanel({
       ? 'No fail cards played.'
       : `${outcome.failCount} fail card${outcome.failCount > 1 ? 's' : ''} played.`
   return (
-    <ActionPanel
-      title={`Quest ${outcome.questNumber} — ${outcome.success ? 'Passed' : 'Failed'}`}
-      subtitle={failLabel}
-    >
-      <ResultIcon success={outcome.success} />
-    </ActionPanel>
+    <ParchmentPanel label={`Quest ${outcome.questNumber}`}>
+      <div className="space-y-3 py-1 text-center">
+        <p
+          className={`font-serif text-2xl font-black uppercase tracking-wide ${
+            outcome.success ? 'text-[#1a4a1e]' : 'text-[#6a1010]'
+          }`}
+        >
+          {outcome.success ? 'Task Passed' : 'Task Failed'}
+        </p>
+        <ResultIcon success={outcome.success} />
+        <p className="text-sm text-[#3a4a5a]">{failLabel}</p>
+      </div>
+    </ParchmentPanel>
   )
 }
 
@@ -155,9 +186,16 @@ function QuestTrack({
   playerCount: number
 }) {
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900 p-3">
-      <p className="mb-2 text-xs font-medium text-slate-400">Quest Track</p>
-      <div className="grid grid-cols-5 gap-2">
+    <div
+      className="overflow-hidden rounded border border-[#2d4a6a]"
+      style={{ boxShadow: '0 2px 8px rgba(0,0,0,0.35)' }}
+    >
+      <div className="bg-[#1a2d4a] px-3 py-1.5 text-center">
+        <span className="font-serif text-[10px] font-bold uppercase tracking-widest text-[#e8c8b0]">
+          Quest Track
+        </span>
+      </div>
+      <div className="grid grid-cols-5 gap-1.5 bg-[#d4ccbe] p-2">
         {Array.from({ length: 5 }, (_, idx) => {
           const questNum = idx + 1
           const done = idx < outcomes.length
@@ -173,25 +211,21 @@ function QuestTrack({
           return (
             <div
               key={questNum}
-              className={`rounded-xl border p-2 text-center ${
+              className={`rounded border p-1.5 text-center ${
                 isCurrent
-                  ? 'border-amber-400 bg-amber-400/10'
-                  : 'border-slate-700 bg-slate-950/50'
+                  ? 'border-[#2d4a6a] bg-[#e8e0d0]'
+                  : 'border-[#2d4a6a]/30 bg-[#ccc4b8]/60'
               }`}
             >
               {icon ? (
-                <img
-                  src={icon}
-                  alt={label}
-                  className="mx-auto mt-1 h-9 w-9 rounded-full"
-                />
+                <img src={icon} alt={label} className="mx-auto h-8 w-8 rounded-sm" />
               ) : (
-                <div className="mx-auto mt-1 flex h-9 w-9 items-center justify-center rounded-full border border-slate-500 text-xs font-semibold text-slate-200">
+                <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-sm border border-[#2d4a6a]/40 font-serif text-xs font-bold text-[#1a1208]">
                   {teamSize}
                 </div>
               )}
-              <p className="mt-1 text-[10px] text-slate-300">
-                {`Quest ${questNum}`}
+              <p className="mt-0.5 font-serif text-[9px] font-bold uppercase text-[#2d3a4a]">
+                Q{questNum}
               </p>
             </div>
           )
@@ -204,27 +238,24 @@ function QuestTrack({
 function RejectionTrack({ rejectionCount }: { rejectionCount: number }) {
   return (
     <div className="grid grid-cols-5 gap-2">
-        {Array.from({ length: 5 }, (_, idx) => {
-          const attempt = idx + 1
-          const rejected = attempt <= rejectionCount
-          return (
+      {Array.from({ length: 5 }, (_, idx) => {
+        const attempt = idx + 1
+        const rejected = attempt <= rejectionCount
+        return (
+          <div key={attempt} className="rounded border border-[#2d4a6a]/30 bg-[#d4ccbe]/50 p-2">
             <div
-              key={attempt}
-              className="rounded-lg border border-slate-700 bg-slate-950/50 p-2"
+              className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full border font-serif text-xs font-bold ${
+                rejected
+                  ? 'border-[#9a2828] bg-[#7a1a1a] text-[#f5d0d0]'
+                  : 'border-[#2d4a6a]/40 text-[#2d3a4a]'
+              }`}
             >
-              <div
-                className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full border text-xs font-semibold ${
-                  rejected
-                    ? 'border-rose-500 bg-rose-600/80 text-white'
-                    : 'border-slate-600 bg-transparent text-slate-400'
-                }`}
-              >
-                {attempt}
-              </div>
+              {attempt}
             </div>
-          )
-        })}
-      </div>
+          </div>
+        )
+      })}
+    </div>
   )
 }
 
@@ -239,6 +270,7 @@ function RoundTable({
   selectableHint = 'Tap to Add',
   statusByActorId = {},
   statusToneByActorId = {},
+  darkMode = true,
 }: {
   players: Array<{
     actorId: string
@@ -254,13 +286,21 @@ function RoundTable({
   selectableHint?: string
   statusByActorId?: Record<string, string>
   statusToneByActorId?: Record<string, 'good' | 'evil'>
+  darkMode?: boolean
 }) {
   const radius = 38
   const center = 50
   return (
-    <div className="rounded-lg border border-slate-700 bg-slate-900 p-3">
-      <div className="relative mx-auto aspect-square w-full max-w-[21rem] rounded-full border-2 border-slate-600/80 bg-[radial-gradient(circle,#0f172a,#020617)]">
-        <div className="absolute inset-[22%] rounded-full border border-slate-700 bg-slate-950/40" />
+    <div
+      className={`overflow-hidden rounded border border-[#2d4a6a] p-2 ${
+        darkMode ? 'bg-[#0a0f1a]' : 'bg-[#d4ccbe]'
+      }`}
+    >
+      <div
+        className={`relative mx-auto aspect-square w-full max-w-[21rem] rounded-full border border-[#1e3050] ${
+          darkMode ? 'bg-[#0d1623]' : 'bg-[#1a2d4a]'
+        }`}
+      >
         {players.map((player, index) => {
           const angle = (index / players.length) * Math.PI * 2 - Math.PI / 2
           const x = center + radius * Math.cos(angle)
@@ -272,6 +312,32 @@ function RoundTable({
           const isDisabled = disabledActorIds.includes(player.actorId)
           const interactive = Boolean(onPlayerClick && isSelectable)
           const statusTone = statusToneByActorId[player.actorId]
+
+          let chipBg: string
+          let nameColor: string
+          if (highlighted) {
+            chipBg = 'border-[#9a2828] bg-[#7a1a1a]'
+            nameColor = 'text-[#f5d0d0]'
+          } else if (onTeam) {
+            chipBg = 'border-[#267238] bg-[#1c5226]'
+            nameColor = 'text-white'
+          } else if (darkMode) {
+            chipBg = 'border-[#2d4a6a] bg-[#0f1a2e]'
+            nameColor = 'text-[#c8d8e8]'
+          } else {
+            chipBg = 'border-[#2d4a6a] bg-[#1a2d4a]'
+            nameColor = 'text-[#e8e0d0]'
+          }
+
+          const statusColor =
+            statusTone === 'good'
+              ? 'text-[#4ade80]'
+              : statusTone === 'evil'
+                ? 'text-[#f87171]'
+                : darkMode
+                  ? 'text-[#7a9ab8]'
+                  : 'text-[#a8bcd0]'
+
           return (
             <div
               key={player.actorId}
@@ -285,43 +351,25 @@ function RoundTable({
                   if (!interactive || isDisabled || !onPlayerClick) return
                   onPlayerClick(player.actorId)
                 }}
-                className={`w-20 rounded-lg border px-2 py-1 text-center text-[11px] ${
-                  highlighted
-                    ? 'border-rose-400 bg-rose-500/20'
-                    : onTeam
-                      ? 'border-emerald-400 bg-emerald-400/15'
-                      : 'border-slate-700 bg-slate-950/70'
-                } ${
-                  interactive
-                    ? 'cursor-pointer active:scale-[0.98]'
-                    : ''
-                } ${
-                  isDisabled ? 'opacity-45' : ''
-                }`}
+                className={`w-20 rounded border-2 px-2 py-1 text-center ${chipBg} ${
+                  interactive ? 'cursor-pointer active:scale-[0.98]' : ''
+                } ${isDisabled ? 'opacity-45' : ''}`}
               >
-                <p className="truncate text-[10px] font-semibold text-slate-100">
+                <p className={`truncate text-[11px] font-semibold ${nameColor}`}>
                   {player.displayName}
                 </p>
-                <p
-                  className={`text-[10px] ${
-                    statusTone === 'good'
-                      ? 'text-emerald-300'
-                      : statusTone === 'evil'
-                        ? 'text-rose-300'
-                        : 'text-slate-400'
-                  }`}
-                >
+                <p className={`text-[10px] ${statusColor}`}>
                   {statusByActorId[player.actorId]
                     ? statusByActorId[player.actorId]
                     : isLeader
-                    ? 'Leader'
-                    : !player.connected
-                      ? 'Offline'
-                      : onTeam
-                        ? 'On Team'
-                        : isSelectable
-                          ? selectableHint
-                        : 'Player'}
+                      ? 'Leader'
+                      : !player.connected
+                        ? 'Offline'
+                        : onTeam
+                          ? 'On Team'
+                          : isSelectable
+                            ? selectableHint
+                            : 'Player'}
                 </p>
               </button>
             </div>
@@ -361,6 +409,11 @@ function App() {
     if (typeof window === 'undefined') return null
     return extractRoomCodeFromLocation(window.location)
   }, [])
+
+  const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') !== 'light')
+  useEffect(() => {
+    localStorage.setItem('theme', darkMode ? 'dark' : 'light')
+  }, [darkMode])
 
   const [displayName, setDisplayName] = useState(() => getStoredName())
   const [roomCodeInput, setRoomCodeInput] = useState(() => deepLinkRoomCode ?? '')
@@ -510,19 +563,19 @@ function App() {
 
   if (!entry.ready) {
     return (
-      <main className="mx-auto min-h-dvh max-w-xl bg-slate-950 px-4 py-8 text-slate-100">
+      <main className="mx-auto min-h-dvh max-w-xl bg-[#0d0b08] px-4 py-8 text-[#e8e0d0]">
         <div className="space-y-6">
-          <header className="space-y-1">
-            <p className="text-sm font-medium text-amber-400">Avalon</p>
-            <h1 className="text-2xl font-bold">Mobile Command Table</h1>
-            <p className="text-sm text-slate-400">
-              Browser-based social deduction with private role reveals and synchronized turns.
+          <header className="space-y-1 text-center">
+            <p className="font-serif text-6xl font-bold uppercase tracking-[0.3em] text-[#8b1f33]">Avalon</p>
+            <h1 className="font-serif text-2xl font-black text-[#e8d0a0]">Mobile Round Table Experience</h1>
+            <p className="text-lg text-[#8a7050]">
+              Play The Hit Party Board Game Anywhere
             </p>
           </header>
 
           <Section title="Enter Player Name">
             <input
-              className="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2"
+              className="w-full rounded border border-[#2d4a6a]/50 bg-[#e8e0d0] px-3 py-2.5 text-base text-[#1e1408] placeholder:text-[#8a9aaa]"
               placeholder="Your name"
               value={displayName}
               onChange={(event) => setDisplayName(event.target.value)}
@@ -531,7 +584,7 @@ function App() {
 
           <Section title="Create Room">
             <button
-              className="w-full rounded-lg bg-emerald-500 px-4 py-3 font-semibold text-slate-950 disabled:opacity-40"
+              className="w-full rounded bg-[#1a2d4a] px-4 py-3 font-serif font-bold uppercase tracking-wider text-[#f0d878] disabled:opacity-40"
               disabled={displayName.trim().length < 2}
               onClick={() => {
                 const roomCode = randomRoomCode()
@@ -552,7 +605,7 @@ function App() {
           <Section title="Join Room">
             <div className="space-y-3">
               <input
-                className="w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 uppercase"
+                className="w-full rounded border border-[#2d4a6a]/50 bg-[#e8e0d0] px-3 py-2.5 text-base uppercase text-[#1e1408] placeholder:text-[#8a9aaa]"
                 placeholder="Room code"
                 value={roomCodeInput}
                 onChange={(event) =>
@@ -562,7 +615,7 @@ function App() {
                 }
               />
               <button
-                className="w-full rounded-lg bg-amber-500 px-4 py-3 font-semibold text-slate-950 disabled:opacity-40"
+                className="w-full rounded bg-[#1a2d4a] px-4 py-3 font-serif font-bold uppercase tracking-wider text-[#f0d878] disabled:opacity-40"
                 disabled={
                   displayName.trim().length < 2 ||
                   !isValidRoomCode(normalizedRoomInput)
@@ -584,7 +637,7 @@ function App() {
                 Join Room
               </button>
               {deepLinkRoomCode ? (
-                <p className="text-xs text-slate-400">
+                <p className="text-sm text-[#3a4a5a]">
                   Shared room detected: <strong>{deepLinkRoomCode}</strong>
                 </p>
               ) : null}
@@ -597,8 +650,8 @@ function App() {
 
   if (!state || !identity) {
     return (
-      <main className="mx-auto min-h-dvh max-w-xl px-4 py-8 text-slate-100 bg-slate-950">
-        <p className="text-sm text-slate-300">Connecting room...</p>
+      <main className="mx-auto min-h-dvh max-w-xl bg-[#0d0b08] px-4 py-8 text-[#e8e0d0]">
+        <p className="text-sm text-[#8a7050]">Connecting to room...</p>
       </main>
     )
   }
@@ -703,12 +756,14 @@ function App() {
       : {}
 
   return (
-    <main className="mx-auto min-h-dvh max-w-xl bg-slate-950 px-4 py-6 text-slate-100">
+    <main className={`mx-auto min-h-dvh max-w-xl px-4 py-6 ${darkMode ? 'bg-[#0d0b08] text-[#e8d0a0]' : 'bg-[#f5ead0] text-[#1e1408]'}`}>
       <div className="space-y-4">
         <InviteTools
           roomCode={state.room.roomCode}
           variant="floating"
           floatingTopClass="top-[36%]"
+          darkMode={darkMode}
+          onDarkModeToggle={() => setDarkMode((d) => !d)}
         />
 
         <RoundTable
@@ -716,6 +771,7 @@ function App() {
           teamIds={roundTableTeamIds}
           leaderId={leaderId}
           highlightIds={roundTableHighlightIds}
+          darkMode={darkMode}
           selectableActorIds={
             canInteractWithRoundTable
               ? sortedPlayers.map((p) => p.actorId)
@@ -804,27 +860,32 @@ function App() {
 
         {state.phase === 'lobby' ? (
           <Section title="Lobby">
-            <div className="space-y-3">
-              <p className="text-sm text-slate-300">
-                {canStart
-                  ? `${playerCount} players ready. Avalon supports 5 to 10 players.`
-                  : `Need 5-10 players. Current: ${playerCount}`}
-              </p>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <p className="text-base text-[#1e1408]">
+                  {canStart
+                    ? `${playerCount} players ready.`
+                    : `Need 5–10 players. Current: ${playerCount}`}
+                </p>
+                <span className="font-serif text-sm font-bold tracking-widest text-[#1a2d4a]">
+                  {state.room.roomCode}
+                </span>
+              </div>
 
               {state.hostActorId === identity.actorId ? (
-                <div className="space-y-3 rounded-lg border border-slate-700 bg-slate-950/40 p-3">
-                  <p className="text-xs font-medium text-slate-400">Role Toggles</p>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  {(
-                    [
-                      ['mordred', 'Mordred'],
+                <div className="space-y-3 rounded border border-[#2d4a6a]/40 bg-[#d4ccbe]/20 p-3">
+                  <p className="text-sm font-medium text-[#3a4a5a]">Role Toggles</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(
+                      [
+                        ['mordred', 'Mordred'],
                         ['oberon', 'Oberon'],
                         ['morgana', 'Morgana'],
                         ['percival', 'Percival'],
                         ['ladyOfTheLake', 'Lady of the Lake'],
                       ] as const
                     ).map(([key, label]) => (
-                      <label key={key} className="flex items-center gap-2 rounded-lg bg-slate-900/70 p-2">
+                      <label key={key} className="flex items-center gap-2 rounded border border-[#2d4a6a]/30 bg-[#d4ccbe]/30 p-2 text-[#1e1408]">
                         <input
                           type="checkbox"
                           checked={state.room.enabledRoles[key]}
@@ -842,17 +903,17 @@ function App() {
                         <img
                           src={optionalRoleIconByKey[key]}
                           alt=""
-                          className="h-8 w-8 rounded-md border border-slate-700 object-cover"
+                          className="h-8 w-8 rounded border border-[#2d4a6a]/40 object-cover"
                         />
-                        <span>{label}</span>
+                        <span className="text-sm">{label}</span>
                       </label>
                     ))}
                   </div>
 
-                  <label className="block space-y-2 text-sm">
+                  <label className="block space-y-1.5 text-sm text-[#1e1408]">
                     <span>Assassination Mode</span>
                     <select
-                      className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2"
+                      className="w-full rounded border border-[#2d4a6a]/50 bg-[#e8e0d0] px-3 py-2 text-[#1e1408]"
                       value={state.room.houseRules.assassinationMode}
                       onChange={(event) => {
                         dispatch({
@@ -873,7 +934,7 @@ function App() {
                     </select>
                   </label>
 
-                  <label className="flex items-center gap-2 rounded-lg bg-slate-900/70 p-2 text-sm">
+                  <label className="flex items-center gap-2 rounded border border-[#2d4a6a]/30 bg-[#d4ccbe]/30 p-2 text-sm text-[#1e1408]">
                     <input
                       type="checkbox"
                       checked={state.room.houseRules.allowGoodFail}
@@ -881,17 +942,30 @@ function App() {
                         dispatch({
                           type: 'update_house_rules',
                           actorId: identity.actorId,
-                          houseRules: {
-                            allowGoodFail: event.target.checked,
-                          },
+                          houseRules: { allowGoodFail: event.target.checked },
                         })
                       }}
                     />
                     <span>Allow good players to vote Fail</span>
                   </label>
 
+                  <label className="flex items-center gap-2 rounded border border-[#2d4a6a]/30 bg-[#d4ccbe]/30 p-2 text-sm text-[#1e1408]">
+                    <input
+                      type="checkbox"
+                      checked={state.room.houseRules.hideVotes}
+                      onChange={(event) => {
+                        dispatch({
+                          type: 'update_house_rules',
+                          actorId: identity.actorId,
+                          houseRules: { hideVotes: event.target.checked },
+                        })
+                      }}
+                    />
+                    <span>Hide vote counts until reveal</span>
+                  </label>
+
                   <button
-                    className="w-full rounded-lg bg-emerald-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-40"
+                    className="w-full rounded border border-[#1e3a5a] bg-[#1a2d4a] px-4 py-3 font-serif font-bold uppercase tracking-wider text-[#f0d878] disabled:opacity-40"
                     disabled={!canStart}
                     onClick={() => dispatch({ type: 'start_game', actorId: identity.actorId })}
                   >
@@ -899,7 +973,7 @@ function App() {
                   </button>
                 </div>
               ) : (
-                <p className="text-xs text-slate-400">Host configures roles and starts the game.</p>
+                <p className="text-sm text-[#3a4a5a]">Host configures roles and starts the game.</p>
               )}
             </div>
           </Section>
@@ -907,23 +981,27 @@ function App() {
 
         {state.phase === 'private_reveal' && myRole ? (
           <Section title="Private Reveal">
-            <div className="space-y-3 text-sm">
-              <p className="text-slate-300">Role: <strong>{roleLabel(myRole.role)}</strong></p>
-              <p className="text-slate-300">Team: <strong>{myRole.alignment.toUpperCase()}</strong></p>
+            <div className="space-y-4">
+              <div className="space-y-1 text-base text-[#1e1408]">
+                <p>Role: <strong>{roleLabel(myRole.role)}</strong></p>
+                <p>Team: <strong>{myRole.alignment.toUpperCase()}</strong></p>
+              </div>
               {myVisibility ? (
-                <div className="rounded-lg bg-slate-950/60 p-3 text-xs text-slate-300">
+                <div className="rounded border border-[#2d4a6a]/40 bg-[#d4ccbe]/30 p-3 text-sm text-[#1e1408]">
                   {myVisibility.seesEvilIds.length > 0 ? (
                     <p>
-                      You see evil: {myVisibility.seesEvilIds
+                      You see evil:{' '}
+                      <strong>{myVisibility.seesEvilIds
                         .map((id) => state.players.find((p) => p.actorId === id)?.displayName ?? id)
-                        .join(', ')}
+                        .join(', ')}</strong>
                     </p>
                   ) : null}
                   {myVisibility.seesMerlinOrMorganaIds.length > 0 ? (
                     <p className="mt-1">
-                      Merlin candidates: {myVisibility.seesMerlinOrMorganaIds
+                      Merlin candidates:{' '}
+                      <strong>{myVisibility.seesMerlinOrMorganaIds
                         .map((id) => state.players.find((p) => p.actorId === id)?.displayName ?? id)
-                        .join(', ')}
+                        .join(', ')}</strong>
                     </p>
                   ) : null}
                   {myVisibility.seesEvilIds.length === 0 &&
@@ -934,13 +1012,13 @@ function App() {
               ) : null}
               {!state.revealDismissedBy.includes(identity.actorId) ? (
                 <button
-                  className="w-full rounded-lg bg-amber-400 px-4 py-3 font-semibold text-slate-950"
+                  className="w-full rounded border border-[#1e3a5a] bg-[#1a2d4a] px-4 py-3 font-serif font-bold uppercase tracking-wider text-[#f0d878]"
                   onClick={() => dispatch({ type: 'dismiss_reveal', actorId: identity.actorId })}
                 >
                   Confirm to Continue
                 </button>
               ) : (
-                <p className="text-xs text-slate-400">
+                <p className="text-sm text-[#3a4a5a]">
                   Waiting for others to confirm ({state.revealDismissedBy.length}/{connectedPlayerCount})
                 </p>
               )}
@@ -950,8 +1028,8 @@ function App() {
 
         {state.phase === 'team_proposal' ? (
           <Section title={`Quest ${state.round.questNumber}: Team Proposal (${teamSizeRequired} players)`}>
-            <div className="space-y-3 text-sm">
-              <p>
+            <div className="space-y-4">
+              <p className="text-base text-[#1e1408]">
                 <strong>
                   {state.players.find((p) => p.actorId === leaderId)?.displayName ?? 'Unknown'}
                 </strong>{' '}
@@ -959,23 +1037,21 @@ function App() {
               </p>
 
               {isLeader ? (
-                <div className="space-y-2">
-                  <button
-                    className="w-full rounded-lg bg-emerald-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-40"
-                    disabled={teamDraft.length !== teamSizeRequired}
-                    onClick={() =>
-                      dispatch({
-                        type: 'propose_team',
-                        actorId: isSoloTestRoom && leaderId ? leaderId : identity.actorId,
-                        team: teamDraft,
-                      })
-                    }
-                  >
-                    Submit Team
-                  </button>
-                </div>
+                <button
+                  className="w-full rounded border border-[#1e3a5a] bg-[#1a2d4a] px-4 py-3 font-serif font-bold uppercase tracking-wider text-[#f0d878] disabled:opacity-40"
+                  disabled={teamDraft.length !== teamSizeRequired}
+                  onClick={() =>
+                    dispatch({
+                      type: 'propose_team',
+                      actorId: isSoloTestRoom && leaderId ? leaderId : identity.actorId,
+                      team: teamDraft,
+                    })
+                  }
+                >
+                  Submit Team
+                </button>
               ) : (
-                <p className="text-xs text-slate-400">Waiting for leader to propose a team.</p>
+                <p className="text-sm text-[#3a4a5a]">Waiting for leader to propose a team.</p>
               )}
             </div>
           </Section>
@@ -983,13 +1059,14 @@ function App() {
 
         {state.phase === 'proposal_vote' ? (
           <ActionPanel
-            title="Approve this team?"
+            title="Cast Your Vote"
             footer={
-              <p>
-                Votes cast: {Object.keys(state.round.proposalVotes).length} / {connectedPlayerCount}
-              </p>
+              !state.room.houseRules.hideVotes ? (
+                <p>Votes cast: {Object.keys(state.round.proposalVotes).length} / {connectedPlayerCount}</p>
+              ) : undefined
             }
           >
+            <p className="mb-4 text-center font-serif text-base text-[#1e1408]">Approve this team?</p>
             {!Object.hasOwn(state.round.proposalVotes, identity.actorId) ? (
               <div className="grid grid-cols-2 gap-3">
                 <VoteButton
@@ -1010,7 +1087,7 @@ function App() {
                 />
               </div>
             ) : (
-              <p className="text-sm text-slate-400">Vote locked. Waiting for all players.</p>
+              <p className="text-center text-sm text-[#3a4a5a]">Vote locked. Waiting for all players.</p>
             )}
           </ActionPanel>
         ) : null}
@@ -1020,7 +1097,7 @@ function App() {
             <TeamResultPanel approved={Boolean(state.round.proposalApproved)} />
             {state.hostActorId === identity.actorId ? (
               <button
-                className="w-full rounded-lg bg-amber-400 px-4 py-3 font-semibold text-slate-950"
+                className="w-full rounded border border-[#1e3a5a] bg-[#1a2d4a] px-4 py-3 font-serif font-bold uppercase tracking-wider text-[#f0d878]"
                 onClick={() =>
                   dispatch({
                     type: 'advance_proposal_vote_reveal',
@@ -1031,24 +1108,27 @@ function App() {
                 Continue
               </button>
             ) : (
-              <p className="text-center text-xs text-slate-400">Waiting for host to continue.</p>
+              <p className="text-center text-sm text-[#3a4a5a]">Waiting for host to continue.</p>
             )}
           </div>
         ) : null}
 
         {state.phase === 'quest_vote' ? (
           <ActionPanel
-            title="Quest Action"
-            subtitle="Your vote is final. Individual cards remain secret."
+            title="Task Action"
+            subtitle="Your card is final. Individual cards remain secret."
             footer={
               !canPlayFail ? (
-                <p>Good players cannot vote Fail in this game.</p>
+                <p>Good players cannot play a Fail card.</p>
+              ) : !state.room.houseRules.hideVotes ? (
+                <p>Cards submitted: {Object.keys(state.round.questVotes).length} / {state.round.proposedTeam.length}</p>
               ) : undefined
             }
           >
+            <p className="mb-4 text-center font-serif text-base text-[#1e1408]">Perform Task</p>
             {isQuestMember(state, identity.actorId) ? (
               Object.hasOwn(state.round.questVotes, identity.actorId) ? (
-                <p className="text-sm text-slate-400">Quest card submitted. Waiting for others.</p>
+                <p className="text-center text-sm text-[#3a4a5a]">Card submitted. Waiting for others.</p>
               ) : (
                 <div className="grid grid-cols-2 gap-3">
                   <VoteButton
@@ -1071,7 +1151,7 @@ function App() {
                 </div>
               )
             ) : (
-              <p className="text-sm text-slate-400">You are not on this quest team.</p>
+              <p className="text-center text-sm text-[#3a4a5a]">You are not on this quest team.</p>
             )}
           </ActionPanel>
         ) : null}
@@ -1083,7 +1163,7 @@ function App() {
             />
             {state.hostActorId === identity.actorId ? (
               <button
-                className="w-full rounded-lg bg-amber-400 px-4 py-3 font-semibold text-slate-950"
+                className="w-full rounded border border-[#1e3a5a] bg-[#1a2d4a] px-4 py-3 font-serif font-bold uppercase tracking-wider text-[#f0d878]"
                 onClick={() =>
                   dispatch({
                     type: 'advance_quest_vote_reveal',
@@ -1094,28 +1174,28 @@ function App() {
                 Continue
               </button>
             ) : (
-              <p className="text-center text-xs text-slate-400">Waiting for host to continue.</p>
+              <p className="text-center text-sm text-[#3a4a5a]">Waiting for host to continue.</p>
             )}
           </div>
         ) : null}
 
         {state.phase === 'lady_of_lake' ? (
           <Section title="Lady of the Lake">
-            <div className="space-y-3 text-sm">
-              <p>
+            <div className="space-y-4">
+              <p className="text-base text-[#1e1408]">
                 Holder:{' '}
                 <strong>
                   {state.players.find((p) => p.actorId === state.round.ladyHolderId)?.displayName ?? 'Unknown'}
                 </strong>
               </p>
               {state.round.ladyPeekResult?.holderId === identity.actorId ? (
-                <div className="space-y-3 rounded-lg bg-slate-950/50 p-3 text-xs text-slate-200">
-                  <p>
+                <div className="space-y-3 rounded border border-[#2d4a6a]/40 bg-[#d4ccbe]/30 p-3">
+                  <p className="text-base text-[#1e1408]">
                     {state.players.find((p) => p.actorId === state.round.ladyPeekResult?.targetId)?.displayName}
                     {' '}is <strong>{state.round.ladyPeekResult.alignment.toUpperCase()}</strong>.
                   </p>
                   <button
-                    className="w-full rounded-lg bg-amber-400 px-4 py-3 font-semibold text-slate-950"
+                    className="w-full rounded border border-[#1e3a5a] bg-[#1a2d4a] px-4 py-3 font-serif font-bold uppercase tracking-wider text-[#f0d878]"
                     onClick={() => dispatch({ type: 'lady_acknowledge', actorId: identity.actorId })}
                   >
                     Continue
@@ -1128,7 +1208,7 @@ function App() {
                     .map((player) => (
                       <button
                         key={player.actorId}
-                        className="rounded-lg border border-slate-700 bg-slate-900/60 px-2 py-2 text-left"
+                        className="rounded border border-[#2d4a6a]/50 bg-[#d4ccbe]/40 px-2 py-2 text-left text-sm text-[#1a1208] active:bg-[#d4ccbe]/60"
                         onClick={() => dispatch({ type: 'lady_peek', actorId: identity.actorId, targetId: player.actorId })}
                       >
                         Inspect {player.displayName}
@@ -1136,7 +1216,7 @@ function App() {
                     ))}
                 </div>
               ) : (
-                <p className="text-xs text-slate-400">
+                <p className="text-sm text-[#3a4a5a]">
                   {state.round.ladyPeekResult
                     ? 'Waiting for Lady holder to review the result.'
                     : 'Waiting for Lady holder action.'}
@@ -1148,8 +1228,8 @@ function App() {
 
         {state.phase === 'assassination' ? (
           <Section title="Assassination Phase">
-            <div className="space-y-3 text-sm">
-              <p>
+            <div className="space-y-4">
+              <p className="text-base text-[#1e1408]">
                 Assassin:{' '}
                 <strong>
                   {state.players.find((p) => p.actorId === state.assassination?.assassinId)?.displayName}
@@ -1157,33 +1237,33 @@ function App() {
               </p>
 
               {state.assassination?.assassinId === identity.actorId ? (
-                <p className="text-xs text-slate-400">
+                <p className="text-sm text-[#3a4a5a]">
                   Tap a good player on the round table to nominate.
                 </p>
               ) : null}
 
               {state.assassination?.suspectId ? (
-                <p>
+                <p className="text-base text-[#1e1408]">
                   Suspect:{' '}
                   <strong>
                     {state.players.find((p) => p.actorId === state.assassination?.suspectId)?.displayName}
                   </strong>
                 </p>
               ) : (
-                <p className="text-xs text-slate-400">Waiting for assassin nomination.</p>
+                <p className="text-sm text-[#3a4a5a]">Waiting for assassin nomination.</p>
               )}
 
               {state.room.houseRules.assassinationMode === 'evil_confirm_majority_excl_oberon' &&
               state.assassination?.suspectId ? (
-                <div className="space-y-2">
-                  <p className="text-xs text-slate-400">
+                <div className="space-y-3">
+                  <p className="text-sm text-[#3a4a5a]">
                     Eligible evil voters (except Oberon): {state.assassination.eligibleVoters.length}
                   </p>
                   {state.assassination.eligibleVoters.includes(identity.actorId) &&
                   !Object.hasOwn(state.assassination.votes, identity.actorId) ? (
                     <div className="grid grid-cols-2 gap-2">
                       <button
-                        className="rounded-lg bg-emerald-400 px-3 py-3 font-semibold text-slate-950"
+                        className="rounded border-2 border-[#267238] bg-[#1c5226] px-3 py-3 font-serif font-bold uppercase tracking-wide text-white"
                         onClick={() =>
                           dispatch({
                             type: 'assassination_confirm_vote',
@@ -1195,7 +1275,7 @@ function App() {
                         Confirm
                       </button>
                       <button
-                        className="rounded-lg bg-rose-400 px-3 py-3 font-semibold text-slate-950"
+                        className="rounded border-2 border-[#9a2828] bg-[#7a1a1a] px-3 py-3 font-serif font-bold uppercase tracking-wide text-[#f5d0d0]"
                         onClick={() =>
                           dispatch({
                             type: 'assassination_confirm_vote',
@@ -1208,7 +1288,7 @@ function App() {
                       </button>
                     </div>
                   ) : (
-                    <p className="text-xs text-slate-400">Waiting for evil confirmation votes.</p>
+                    <p className="text-sm text-[#3a4a5a]">Waiting for evil confirmation votes.</p>
                   )}
                 </div>
               ) : null}
@@ -1219,10 +1299,14 @@ function App() {
         {state.phase === 'game_end' ? (
           <Section title="Game Result">
             <div className="space-y-2">
-              <p className="text-2xl font-black">
+              <p
+                className={`font-serif text-2xl font-black uppercase tracking-wide ${
+                  state.winner === 'good' ? 'text-[#1a4a1e]' : 'text-[#6a1010]'
+                }`}
+              >
                 {state.winner === 'good' ? 'Good Wins' : 'Evil Wins'}
               </p>
-              <p className="text-sm text-slate-300">{state.winningReason}</p>
+              <p className="text-sm text-[#3a4a5a]">{state.winningReason}</p>
             </div>
           </Section>
         ) : null}

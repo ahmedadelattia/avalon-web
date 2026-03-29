@@ -38,6 +38,7 @@ export interface HouseRules {
   assassinationMode: AssassinationRuleMode
   assassinationConfirmTimeoutMs: number
   allowGoodFail: boolean
+  hideVotes: boolean
 }
 
 export interface RoomConfig {

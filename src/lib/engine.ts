@@ -22,6 +22,7 @@ export const DEFAULT_HOUSE_RULES: HouseRules = {
   assassinationMode: 'evil_confirm_majority_excl_oberon',
   assassinationConfirmTimeoutMs: 30000,
   allowGoodFail: true,
+  hideVotes: false,
 }
 
 function nowSafe(now?: number): number {

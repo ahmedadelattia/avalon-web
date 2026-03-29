@@ -2,8 +2,8 @@
 
 :root {
   font-family: "Avenir Next", "Segoe UI", sans-serif;
-  color: #e2e8f0;
-  background: #020617;
+  color: #1e1408;
+  background: #0d0b08;
 }
 
 * {
@@ -13,7 +13,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: #020617;
+  background: #0d0b08;
 }
 
 button,
