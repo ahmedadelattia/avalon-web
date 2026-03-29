@@ -92,6 +92,38 @@ function QuestTrack({
   )
 }
 
+function RejectionTrack({ rejectionCount }: { rejectionCount: number }) {
+  return (
+    <div className="rounded-2xl border border-amber-800/40 bg-slate-900/70 p-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-amber-300">
+        Rejection Track
+      </p>
+      <div className="mt-2 grid grid-cols-5 gap-2">
+        {Array.from({ length: 5 }, (_, idx) => {
+          const attempt = idx + 1
+          const rejected = attempt <= rejectionCount
+          return (
+            <div
+              key={attempt}
+              className="rounded-xl border border-slate-700 bg-slate-950/50 p-2"
+            >
+              <div
+                className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full border text-xs font-semibold ${
+                  rejected
+                    ? 'border-rose-400 bg-rose-500/80 text-white'
+                    : 'border-slate-500 bg-transparent text-slate-300'
+                }`}
+              >
+                {attempt}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function RoundTable({
   players,
   teamIds,
@@ -749,7 +781,7 @@ function App() {
                 </strong>
               </p>
               <p>Quest size: {getQuestTeamSize(state.players.length, state.round.questNumber)}</p>
-              <p>Rejected proposals this round: {state.round.rejectionCount}/5</p>
+              <RejectionTrack rejectionCount={state.round.rejectionCount} />
 
               {isLeader ? (
                 <div className="space-y-2">
