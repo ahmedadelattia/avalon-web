@@ -141,6 +141,7 @@ function RoundTable({
   disabledActorIds = [],
   onPlayerClick,
   selectableHint = 'Tap to Add',
+  statusByActorId = {},
 }: {
   players: Array<{
     actorId: string
@@ -154,6 +155,7 @@ function RoundTable({
   disabledActorIds?: string[]
   onPlayerClick?: (actorId: string) => void
   selectableHint?: string
+  statusByActorId?: Record<string, string>
 }) {
   const radius = 38
   const center = 50
@@ -205,7 +207,9 @@ function RoundTable({
                   {player.displayName}
                 </p>
                 <p className="text-[10px] text-slate-400">
-                  {isLeader
+                  {statusByActorId[player.actorId]
+                    ? statusByActorId[player.actorId]
+                    : isLeader
                     ? 'Leader'
                     : !player.connected
                       ? 'Offline'
@@ -577,6 +581,11 @@ function App() {
           selectableHint={
             state.phase === 'assassination' ? 'Tap to Nominate' : 'Tap to Add'
           }
+          statusByActorId={
+            state.phase === 'assassination' && state.assassination?.suspectId
+              ? { [state.assassination.suspectId]: 'Suspect' }
+              : {}
+          }
           onPlayerClick={(actorId) => {
             if (canInteractWithRoundTable) {
               setTeamDraft((prev) => {
@@ -601,6 +610,21 @@ function App() {
             }
           }}
         />
+
+        {state.phase !== 'lobby' && state.phase !== 'private_reveal' ? (
+          myRole ? (
+            <HoldToRevealButton
+              roleKey={myRole.role}
+              roleLabel={roleLabel(myRole.role)}
+              alignmentLabel={myRole.alignment.toUpperCase()}
+              power={getRolePowerText(myRole.role)}
+              visiblePlayers={visiblePlayerNames}
+              open={isRevealOpen}
+              onOpenChange={setIsRevealOpen}
+              variant="floating"
+            />
+          ) : null
+        ) : null}
 
         {state.phase === 'lobby' ? (
           <Section title="Lobby">
@@ -797,20 +821,6 @@ function App() {
               )}
             </div>
           </Section>
-        ) : null}
-
-        {state.phase !== 'lobby' && state.phase !== 'private_reveal' ? (
-          myRole ? (
-            <HoldToRevealButton
-              roleKey={myRole.role}
-              roleLabel={roleLabel(myRole.role)}
-              alignmentLabel={myRole.alignment.toUpperCase()}
-              power={getRolePowerText(myRole.role)}
-              visiblePlayers={visiblePlayerNames}
-              open={isRevealOpen}
-              onOpenChange={setIsRevealOpen}
-            />
-          ) : null
         ) : null}
 
         {state.phase === 'proposal_vote' ? (
