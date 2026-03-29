@@ -97,6 +97,9 @@ function RoundTable({
   teamIds,
   leaderId,
   highlightIds,
+  selectableActorIds = [],
+  disabledActorIds = [],
+  onPlayerClick,
 }: {
   players: Array<{
     actorId: string
@@ -106,6 +109,9 @@ function RoundTable({
   teamIds: string[]
   leaderId: string | null
   highlightIds: string[]
+  selectableActorIds?: string[]
+  disabledActorIds?: string[]
+  onPlayerClick?: (actorId: string) => void
 }) {
   const radius = 38
   const center = 50
@@ -123,19 +129,34 @@ function RoundTable({
           const onTeam = teamIds.includes(player.actorId)
           const isLeader = leaderId === player.actorId
           const highlighted = highlightIds.includes(player.actorId)
+          const isSelectable = selectableActorIds.includes(player.actorId)
+          const isDisabled = disabledActorIds.includes(player.actorId)
+          const interactive = Boolean(onPlayerClick && isSelectable)
           return (
             <div
               key={player.actorId}
               className="absolute -translate-x-1/2 -translate-y-1/2"
               style={{ left: `${x}%`, top: `${y}%` }}
             >
-              <div
+              <button
+                type="button"
+                disabled={!interactive || isDisabled}
+                onClick={() => {
+                  if (!interactive || isDisabled || !onPlayerClick) return
+                  onPlayerClick(player.actorId)
+                }}
                 className={`w-20 rounded-lg border px-2 py-1 text-center text-[11px] ${
                   highlighted
                     ? 'border-amber-300 bg-amber-300/20'
                     : onTeam
                       ? 'border-emerald-400 bg-emerald-400/15'
                       : 'border-slate-700 bg-slate-950/70'
+                } ${
+                  interactive
+                    ? 'cursor-pointer active:scale-[0.98]'
+                    : ''
+                } ${
+                  isDisabled ? 'opacity-45' : ''
                 }`}
               >
                 <p className="truncate font-semibold text-slate-100">
@@ -148,9 +169,11 @@ function RoundTable({
                       ? 'Offline'
                       : onTeam
                         ? 'On Team'
+                        : isSelectable
+                          ? 'Tap to Add'
                         : 'Player'}
                 </p>
-              </div>
+              </button>
             </div>
           )
         })}
@@ -238,6 +261,13 @@ function App() {
     if (!entry.ready) return
     await sync.dispatch({ ...action, now: currentTimeMs() } as EngineAction)
   }
+
+  useEffect(() => {
+    if (!state) return
+    if (state.phase !== 'team_proposal') {
+      setTeamDraft([])
+    }
+  }, [state?.phase])
 
   useEffect(() => {
     if (!isSoloTestRoom || !state || !identity) return
@@ -403,6 +433,18 @@ function App() {
     myRole?.alignment === 'evil' || state.room.houseRules.allowGoodFail
   const isGameplayPhase =
     state.phase !== 'lobby' && state.phase !== 'private_reveal'
+  const teamSizeRequired = PLAYER_MATRIX[state.players.length]
+    ? getQuestTeamSize(state.players.length, state.round.questNumber)
+    : 0
+  const canInteractWithRoundTable = state.phase === 'team_proposal' && isLeader
+  const roundTableTeamIds =
+    state.phase === 'team_proposal' ? teamDraft : state.round.proposedTeam
+  const teamDraftLimitReached = teamDraft.length >= teamSizeRequired
+  const roundTableDisabledIds = canInteractWithRoundTable
+    ? state.players
+        .filter((player) => !teamDraft.includes(player.actorId) && teamDraftLimitReached)
+        .map((player) => player.actorId)
+    : []
 
   const visiblePlayerIds = myVisibility
     ? [...myVisibility.seesEvilIds, ...myVisibility.seesMerlinOrMorganaIds]
@@ -443,9 +485,23 @@ function App() {
             />
             <RoundTable
               players={state.players}
-              teamIds={state.round.proposedTeam}
+              teamIds={roundTableTeamIds}
               leaderId={leaderId}
               highlightIds={visiblePlayerIds}
+              selectableActorIds={canInteractWithRoundTable ? state.players.map((p) => p.actorId) : []}
+              disabledActorIds={roundTableDisabledIds}
+              onPlayerClick={(actorId) => {
+                if (!canInteractWithRoundTable) return
+                setTeamDraft((prev) => {
+                  if (prev.includes(actorId)) {
+                    return prev.filter((id) => id !== actorId)
+                  }
+                  if (prev.length >= teamSizeRequired) {
+                    return prev
+                  }
+                  return [...prev, actorId]
+                })
+              }}
             />
             {myRole ? (
               <HoldToRevealButton
@@ -631,34 +687,14 @@ function App() {
 
               {isLeader ? (
                 <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    {state.players.map((player) => {
-                      const selected = teamDraft.includes(player.actorId)
-                      return (
-                        <button
-                          key={player.actorId}
-                          className={`rounded-lg border px-2 py-2 text-left ${
-                            selected
-                              ? 'border-amber-400 bg-amber-400/20'
-                              : 'border-slate-700 bg-slate-900/50'
-                          }`}
-                          onClick={() => {
-                            setTeamDraft((prev) => {
-                              if (prev.includes(player.actorId)) {
-                                return prev.filter((id) => id !== player.actorId)
-                              }
-                              return [...prev, player.actorId]
-                            })
-                          }}
-                        >
-                          {player.displayName}
-                        </button>
-                      )
-                    })}
-                  </div>
+                  <p className="text-xs text-slate-400">
+                    Tap players on the round table to choose the quest team.
+                    Selected: {teamDraft.length}/{teamSizeRequired}
+                  </p>
 
                   <button
-                    className="w-full rounded-lg bg-emerald-400 px-4 py-3 font-semibold text-slate-950"
+                    className="w-full rounded-lg bg-emerald-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-40"
+                    disabled={teamDraft.length !== teamSizeRequired}
                     onClick={() =>
                       dispatch({
                         type: 'propose_team',
