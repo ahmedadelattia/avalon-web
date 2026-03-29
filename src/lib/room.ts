@@ -20,3 +20,27 @@ export function randomRoomCode(length = ROOM_CODE_LENGTH): string {
   }
   return code
 }
+
+export function extractRoomCodeFromLocation(locationLike: {
+  search: string
+  pathname: string
+}): string | null {
+  const params = new URLSearchParams(locationLike.search)
+  const fromQuery = params.get('room')
+  if (fromQuery && isValidRoomCode(fromQuery)) {
+    return normalizeRoomCode(fromQuery).slice(0, ROOM_CODE_LENGTH)
+  }
+
+  const match = locationLike.pathname.match(/\/room\/([A-Za-z0-9]{6})\/?$/)
+  if (match?.[1] && isValidRoomCode(match[1])) {
+    return normalizeRoomCode(match[1]).slice(0, ROOM_CODE_LENGTH)
+  }
+
+  return null
+}
+
+export function buildInviteUrl(roomCode: string, origin?: string): string {
+  const normalized = normalizeRoomCode(roomCode).slice(0, ROOM_CODE_LENGTH)
+  const baseOrigin = origin ?? window.location.origin
+  return `${baseOrigin}/?room=${normalized}`
+}

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
+import { InviteTools } from './components/InviteTools'
 import { HoldToRevealButton } from './components/HoldToRevealButton'
 import {
   actorRole,
@@ -8,6 +9,7 @@ import {
   roleLabel,
 } from './lib/engine'
 import {
+  extractRoomCodeFromLocation,
   isValidRoomCode,
   normalizeRoomCode,
   randomRoomCode,
@@ -47,8 +49,13 @@ type RoomEntry =
     }
 
 function App() {
+  const deepLinkRoomCode = useMemo(() => {
+    if (typeof window === 'undefined') return null
+    return extractRoomCodeFromLocation(window.location)
+  }, [])
+
   const [displayName, setDisplayName] = useState(() => getStoredName())
-  const [roomCodeInput, setRoomCodeInput] = useState('')
+  const [roomCodeInput, setRoomCodeInput] = useState(() => deepLinkRoomCode ?? '')
   const [entry, setEntry] = useState<RoomEntry>({ ready: false })
   const [teamDraft, setTeamDraft] = useState<string[]>([])
   const localIdentity = useMemo(() => createIdentity('Local Player'), [])
@@ -94,6 +101,14 @@ function App() {
     await sync.dispatch({ ...action, now: currentTimeMs() } as EngineAction)
   }
 
+  function writeRoomToUrl(code: string) {
+    if (typeof window === 'undefined') return
+    const url = new URL(window.location.href)
+    url.pathname = '/'
+    url.search = `?room=${normalizeRoomCode(code).slice(0, ROOM_CODE_LENGTH)}`
+    window.history.replaceState({}, '', url.toString())
+  }
+
   if (!entry.ready) {
     return (
       <main className="mx-auto min-h-dvh max-w-xl bg-[radial-gradient(circle_at_top,#172554,transparent_60%),linear-gradient(170deg,#020617,#0f172a)] px-4 py-8 text-slate-100">
@@ -120,13 +135,15 @@ function App() {
               className="w-full rounded-xl bg-emerald-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-40"
               disabled={displayName.trim().length < 2}
               onClick={() => {
+                const roomCode = randomRoomCode()
                 const identityNext = createIdentity(displayName.trim())
                 setEntry({
                   ready: true,
-                  roomCode: randomRoomCode(),
+                  roomCode,
                   identity: identityNext,
                   isCreator: true,
                 })
+                writeRoomToUrl(roomCode)
               }}
             >
               Create New Room
@@ -155,17 +172,24 @@ function App() {
                   !isValidRoomCode(normalizedRoomInput)
                 }
                 onClick={() => {
+                  const roomCode = normalizedRoomInput.slice(0, ROOM_CODE_LENGTH)
                   const identityNext = createIdentity(displayName.trim())
                   setEntry({
                     ready: true,
-                    roomCode: normalizedRoomInput.slice(0, ROOM_CODE_LENGTH),
+                    roomCode,
                     identity: identityNext,
                     isCreator: false,
                   })
+                  writeRoomToUrl(roomCode)
                 }}
               >
                 Join Room
               </button>
+              {deepLinkRoomCode ? (
+                <p className="text-xs text-slate-400">
+                  Shared room detected: <strong>{deepLinkRoomCode}</strong>
+                </p>
+              ) : null}
             </div>
           </Section>
         </div>
@@ -202,6 +226,9 @@ function App() {
             </div>
           </div>
           {sync.error ? <p className="mt-2 text-xs text-rose-300">{sync.error}</p> : null}
+          <div className="mt-3">
+            <InviteTools roomCode={state.room.roomCode} />
+          </div>
         </header>
 
         {myRole &&

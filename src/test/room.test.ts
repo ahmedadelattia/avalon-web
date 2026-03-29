@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  buildInviteUrl,
+  extractRoomCodeFromLocation,
   isValidRoomCode,
   normalizeRoomCode,
   randomRoomCode,
@@ -26,5 +28,27 @@ describe('room code helpers', () => {
     expect(isValidRoomCode('AbC123')).toBe(true)
     expect(isValidRoomCode('AB!123')).toBe(false)
     expect(isValidRoomCode('AB123')).toBe(false)
+  })
+
+  it('extracts room code from query string and /room path', () => {
+    expect(
+      extractRoomCodeFromLocation({
+        search: '?room=ab12cd',
+        pathname: '/',
+      }),
+    ).toBe('AB12CD')
+
+    expect(
+      extractRoomCodeFromLocation({
+        search: '',
+        pathname: '/room/ab12cd',
+      }),
+    ).toBe('AB12CD')
+  })
+
+  it('builds invite urls with normalized room code', () => {
+    expect(buildInviteUrl('ab12cd', 'https://example.com')).toBe(
+      'https://example.com/?room=AB12CD',
+    )
   })
 })

@@ -31,6 +31,12 @@ Without these, app runs in local-only mode on one device.
 - `npm run test` run unit/component tests with coverage
 - `npm run test:e2e` run Playwright mobile smoke test
 
+## Invites
+- Each room has a shareable URL (`?room=ABC123`) and QR code in the room header.
+- Deep links auto-detect room code from:
+  - query param: `/?room=ABC123`
+  - path: `/room/ABC123`
+
 ## Rules Coverage
 Canonical rule matrix and role behavior are documented in [`docs/rules.md`](docs/rules.md).
 
