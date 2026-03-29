@@ -15,6 +15,7 @@ export type GamePhase =
   | 'private_reveal'
   | 'team_proposal'
   | 'proposal_vote'
+  | 'proposal_vote_reveal'
   | 'quest_vote'
   | 'lady_of_lake'
   | 'assassination'
@@ -103,11 +104,17 @@ export interface RoundState {
   rejectionCount: number
   proposedTeam: string[]
   proposalVotes: Record<string, boolean>
+  proposalApproved: boolean | null
   questVotes: Record<string, 'success' | 'fail'>
   questOutcomes: QuestOutcome[]
   ladyHolderId: string | null
   ladyCheckedIds: string[]
   ladyPeekTargetId: string | null
+  ladyPeekResult: {
+    holderId: string
+    targetId: string
+    alignment: Alignment
+  } | null
 }
 
 export interface GameState {
@@ -171,6 +178,7 @@ export type EngineAction =
   | { type: 'dismiss_reveal'; actorId: string; now: number }
   | { type: 'propose_team'; actorId: string; team: string[]; now: number }
   | { type: 'cast_proposal_vote'; actorId: string; approve: boolean; now: number }
+  | { type: 'advance_proposal_vote_reveal'; actorId: string; now: number }
   | {
       type: 'cast_quest_vote'
       actorId: string
@@ -178,6 +186,7 @@ export type EngineAction =
       now: number
     }
   | { type: 'lady_peek'; actorId: string; targetId: string; now: number }
+  | { type: 'lady_acknowledge'; actorId: string; now: number }
   | {
       type: 'assassination_nominate'
       actorId: string

@@ -178,22 +178,26 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
         if (!current) return
         const presenceState = channel.presenceState<Record<string, unknown>>()
         const connectedIds = new Set(Object.keys(presenceState))
+        let nextState = current
 
         for (const player of current.players) {
           if (player.connected !== connectedIds.has(player.actorId)) {
-            const next = reduceGameState(current, {
+            nextState = reduceGameState(nextState, {
               type: 'player_connection',
               actorId: player.actorId,
               connected: connectedIds.has(player.actorId),
               now: Date.now(),
             })
-            stateRef.current = next
-            setState(next)
           }
         }
 
-        if (!connectedIds.has(current.hostActorId)) {
-          const candidate = [...current.players]
+        if (nextState !== current) {
+          stateRef.current = nextState
+          setState(nextState)
+        }
+
+        if (!connectedIds.has(nextState.hostActorId)) {
+          const candidate = [...nextState.players]
             .filter((p) => connectedIds.has(p.actorId))
             .sort((a, b) => a.joinOrder - b.joinOrder)[0]
 
@@ -203,14 +207,14 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
               roomCode,
               holderId: candidate.actorId,
               sentAt: Date.now(),
-              hostEpoch: current.hostEpoch + 1,
+              hostEpoch: nextState.hostEpoch + 1,
             }
             await sendBroadcast('system', event)
 
-            const migrated = reduceGameState(current, {
+            const migrated = reduceGameState(nextState, {
               type: 'set_host',
               actorId: candidate.actorId,
-              hostEpoch: current.hostEpoch + 1,
+              hostEpoch: nextState.hostEpoch + 1,
               now: Date.now(),
             })
             stateRef.current = migrated

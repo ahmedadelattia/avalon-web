@@ -61,11 +61,13 @@ export function createInitialState(roomCode: string, hostIdentity: {
       rejectionCount: 0,
       proposedTeam: [],
       proposalVotes: {},
+      proposalApproved: null,
       questVotes: {},
       questOutcomes: [],
       ladyHolderId: null,
       ladyCheckedIds: [],
       ladyPeekTargetId: null,
+      ladyPeekResult: null,
     },
     assassination: null,
     winner: null,
@@ -81,6 +83,10 @@ function cloneState(state: GameState): GameState {
 
 function sortedPlayers(state: GameState): PlayerPresence[] {
   return [...state.players].sort((a, b) => a.joinOrder - b.joinOrder)
+}
+
+function connectedPlayers(state: GameState): PlayerPresence[] {
+  return sortedPlayers(state).filter((player) => player.connected)
 }
 
 function assignmentByActor(assignments: RoleAssignment[], actorId: string) {
@@ -131,8 +137,10 @@ function eligibleAssassinationVoters(state: GameState): string[] {
 function prepareQuestRoundForPhase(state: GameState) {
   state.round.proposedTeam = []
   state.round.proposalVotes = {}
+  state.round.proposalApproved = null
   state.round.questVotes = {}
   state.round.ladyPeekTargetId = null
+  state.round.ladyPeekResult = null
   state.phase = 'team_proposal'
 }
 
@@ -154,9 +162,18 @@ function ensureTeamSize(state: GameState, teamIds: string[]) {
   }
 }
 
-function finalizeQuestIfReady(state: GameState) {
+function finalizeQuestIfReady(state: GameState, now: number) {
   if (state.phase !== 'quest_vote') return
   if (state.round.proposedTeam.length === 0) return
+  if (
+    state.round.proposedTeam.some((actorId) => {
+      const player = state.players.find((candidate) => candidate.actorId === actorId)
+      return !player?.connected
+    })
+  ) {
+    prepareQuestRoundForPhase(state)
+    return
+  }
   if (Object.keys(state.round.questVotes).length !== state.round.proposedTeam.length) {
     return
   }
@@ -198,7 +215,7 @@ function finalizeQuestIfReady(state: GameState) {
       suspectId: null,
       eligibleVoters: eligibleAssassinationVoters(state),
       votes: {},
-      deadlineAt: Date.now() + state.room.houseRules.assassinationConfirmTimeoutMs,
+      deadlineAt: now + state.room.houseRules.assassinationConfirmTimeoutMs,
     }
     return
   }
@@ -225,29 +242,42 @@ function finalizeQuestIfReady(state: GameState) {
 
 function finalizeProposalIfReady(state: GameState) {
   if (state.phase !== 'proposal_vote') return
-  if (Object.keys(state.round.proposalVotes).length !== state.players.length) {
+  const voters = connectedPlayers(state)
+  const connectedVoterIds = new Set(voters.map((player) => player.actorId))
+  state.round.proposalVotes = Object.fromEntries(
+    Object.entries(state.round.proposalVotes).filter(([actorId]) => connectedVoterIds.has(actorId)),
+  )
+  if (Object.keys(state.round.proposalVotes).length !== voters.length) {
     return
   }
 
   const approvals = Object.values(state.round.proposalVotes).filter(Boolean).length
-  const approved = approvals > state.players.length / 2
+  state.round.proposalApproved = approvals > voters.length / 2
+  state.phase = 'proposal_vote_reveal'
+}
 
-  if (approved) {
+function advanceProposalVoteReveal(state: GameState) {
+  if (state.phase !== 'proposal_vote_reveal') return
+
+  if (state.round.proposalApproved) {
     state.phase = 'quest_vote'
-    state.round.questVotes = {}
-  } else {
-    state.round.rejectionCount += 1
-    state.round.proposedTeam = []
     state.round.proposalVotes = {}
-    nextLeader(state)
-
-    if (state.round.rejectionCount >= 5) {
-      setWinner(state, 'evil', 'Five consecutive rejected teams')
-      return
-    }
-
-    state.phase = 'team_proposal'
+    state.round.questVotes = {}
+    return
   }
+
+  state.round.rejectionCount += 1
+  state.round.proposedTeam = []
+  state.round.proposalVotes = {}
+  state.round.proposalApproved = null
+  nextLeader(state)
+
+  if (state.round.rejectionCount >= 5) {
+    setWinner(state, 'evil', 'Five consecutive rejected teams')
+    return
+  }
+
+  state.phase = 'team_proposal'
 }
 
 function nominateAssassination(state: GameState, actorId: string, suspectId: string, now: number) {
@@ -355,6 +385,19 @@ export function reduceGameState(state: GameState, action: EngineAction): GameSta
       if (!player) break
       player.connected = action.connected
       player.lastSeenAt = now
+      if (next.phase === 'private_reveal') {
+        const connectedActorIds = new Set(connectedPlayers(next).map((entry) => entry.actorId))
+        next.revealDismissedBy = next.revealDismissedBy.filter((actorId) => connectedActorIds.has(actorId))
+        if (next.revealDismissedBy.length === connectedActorIds.size) {
+          next.phase = 'team_proposal'
+        }
+      }
+      if (next.phase === 'proposal_vote') {
+        finalizeProposalIfReady(next)
+      }
+      if (next.phase === 'quest_vote') {
+        finalizeQuestIfReady(next, now)
+      }
       maybeMigrateHost(next, now)
       break
     }
@@ -413,6 +456,7 @@ export function reduceGameState(state: GameState, action: EngineAction): GameSta
       next.round.rejectionCount = 0
       next.round.proposedTeam = []
       next.round.proposalVotes = {}
+      next.round.proposalApproved = null
       next.round.questVotes = {}
       next.round.questOutcomes = []
       next.round.ladyHolderId =
@@ -423,6 +467,7 @@ export function reduceGameState(state: GameState, action: EngineAction): GameSta
         ? [next.round.ladyHolderId]
         : []
       next.round.ladyPeekTargetId = null
+      next.round.ladyPeekResult = null
       next.assassination = null
       next.winner = null
       next.winningReason = null
@@ -436,7 +481,9 @@ export function reduceGameState(state: GameState, action: EngineAction): GameSta
       if (!next.revealDismissedBy.includes(action.actorId)) {
         next.revealDismissedBy.push(action.actorId)
       }
-      if (next.revealDismissedBy.length === next.players.length) {
+      const connectedActorIds = new Set(connectedPlayers(next).map((player) => player.actorId))
+      next.revealDismissedBy = next.revealDismissedBy.filter((actorId) => connectedActorIds.has(actorId))
+      if (next.revealDismissedBy.length === connectedActorIds.size) {
         next.phase = 'team_proposal'
       }
       break
@@ -455,6 +502,7 @@ export function reduceGameState(state: GameState, action: EngineAction): GameSta
       ensureTeamSize(next, unique)
       next.round.proposedTeam = unique
       next.round.proposalVotes = {}
+      next.round.proposalApproved = null
       next.phase = 'proposal_vote'
       break
     }
@@ -465,6 +513,15 @@ export function reduceGameState(state: GameState, action: EngineAction): GameSta
       }
       next.round.proposalVotes[action.actorId] = action.approve
       finalizeProposalIfReady(next)
+      break
+    }
+
+    case 'advance_proposal_vote_reveal': {
+      if (next.phase !== 'proposal_vote_reveal') {
+        throw new Error('Not in proposal vote reveal phase')
+      }
+      ensureHost(next, action.actorId)
+      advanceProposalVoteReveal(next)
       break
     }
 
@@ -482,7 +539,7 @@ export function reduceGameState(state: GameState, action: EngineAction): GameSta
         }
       }
       next.round.questVotes[action.actorId] = action.card
-      finalizeQuestIfReady(next)
+      finalizeQuestIfReady(next, now)
       break
     }
 
@@ -496,9 +553,26 @@ export function reduceGameState(state: GameState, action: EngineAction): GameSta
       if (next.round.ladyCheckedIds.includes(action.targetId)) {
         throw new Error('Cannot inspect someone who already held Lady')
       }
+      const target = assignmentByActor(next.assignments, action.targetId)
       next.round.ladyPeekTargetId = action.targetId
+      next.round.ladyPeekResult = {
+        holderId: action.actorId,
+        targetId: action.targetId,
+        alignment: target?.alignment ?? 'good',
+      }
       next.round.ladyHolderId = action.targetId
       next.round.ladyCheckedIds.push(action.targetId)
+      break
+    }
+
+    case 'lady_acknowledge': {
+      if (next.phase !== 'lady_of_lake') {
+        throw new Error('Not in Lady of the Lake phase')
+      }
+      if (next.round.ladyPeekResult?.holderId !== action.actorId) {
+        throw new Error('Only Lady holder can acknowledge result')
+      }
+      next.round.ladyPeekResult = null
       prepareQuestRoundForPhase(next)
       break
     }

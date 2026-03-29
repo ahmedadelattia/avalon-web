@@ -330,6 +330,22 @@ function App() {
   }, [state?.phase])
 
   useEffect(() => {
+    if (!state || !identity) return
+    if (state.phase !== 'assassination' || !state.assassination) return
+    if (state.room.houseRules.assassinationMode !== 'evil_confirm_majority_excl_oberon') return
+
+    const delay = Math.max(0, state.assassination.deadlineAt - currentTimeMs())
+    const timeoutId = window.setTimeout(() => {
+      void dispatch({
+        type: 'assassination_timeout',
+        actorId: identity.actorId,
+      })
+    }, delay + 10)
+
+    return () => window.clearTimeout(timeoutId)
+  }, [dispatch, identity, state])
+
+  useEffect(() => {
     if (!isSoloTestRoom || !state || !identity) return
 
     if (state.phase === 'lobby' && state.players.length < 5) {
@@ -364,6 +380,16 @@ function App() {
             approve: true,
           })
         }
+      }
+      return
+    }
+
+    if (state.phase === 'lady_of_lake' && state.round.ladyPeekResult) {
+      if (state.round.ladyPeekResult.holderId === identity.actorId) {
+        void dispatch({
+          type: 'lady_acknowledge',
+          actorId: identity.actorId,
+        })
       }
       return
     }
@@ -485,6 +511,7 @@ function App() {
   }
 
   const playerCount = state.players.length
+  const connectedPlayerCount = state.players.filter((player) => player.connected).length
   const canStart = Boolean(PLAYER_MATRIX[playerCount])
   const canPlayFail =
     myRole?.alignment === 'evil' || state.room.houseRules.allowGoodFail
@@ -788,7 +815,7 @@ function App() {
                 </button>
               ) : (
                 <p className="text-xs text-slate-400">
-                  Waiting for others to confirm ({state.revealDismissedBy.length}/{state.players.length})
+                  Waiting for others to confirm ({state.revealDismissedBy.length}/{connectedPlayerCount})
                 </p>
               )}
             </div>
@@ -859,8 +886,69 @@ function App() {
 
               <div className="rounded-lg bg-slate-950/50 p-3 text-xs text-slate-300">
                 <p>Votes reveal only after all players vote.</p>
-                <p>Submitted: {Object.keys(state.round.proposalVotes).length}/{state.players.length}</p>
+                <p>Submitted: {Object.keys(state.round.proposalVotes).length}/{connectedPlayerCount}</p>
               </div>
+            </div>
+          </Section>
+        ) : null}
+
+        {state.phase === 'proposal_vote_reveal' ? (
+          <Section title="Proposal Vote Results">
+            <div className="space-y-3 text-sm">
+              <p>
+                Proposed team:{' '}
+                {state.round.proposedTeam
+                  .map((id) => state.players.find((p) => p.actorId === id)?.displayName ?? id)
+                  .join(', ')}
+              </p>
+              <div className="space-y-2 rounded-lg bg-slate-950/50 p-3 text-xs text-slate-200">
+                {sortedPlayers.map((player) => {
+                  const vote = state.round.proposalVotes[player.actorId]
+                  return (
+                    <div
+                      key={player.actorId}
+                      className="flex items-center justify-between rounded-md border border-slate-800 px-3 py-2"
+                    >
+                      <span>{player.displayName}</span>
+                      <span
+                        className={
+                          vote === true
+                            ? 'text-emerald-300'
+                            : vote === false
+                              ? 'text-rose-300'
+                              : 'text-slate-500'
+                        }
+                      >
+                        {vote === true
+                          ? 'Approve'
+                          : vote === false
+                            ? 'Reject'
+                            : player.connected
+                              ? 'Pending'
+                              : 'Offline'}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+              <p className={state.round.proposalApproved ? 'text-emerald-300' : 'text-rose-300'}>
+                {state.round.proposalApproved ? 'Team approved.' : 'Team rejected.'}
+              </p>
+              {state.hostActorId === identity.actorId ? (
+                <button
+                  className="w-full rounded-lg bg-amber-400 px-4 py-3 font-semibold text-slate-950"
+                  onClick={() =>
+                    dispatch({
+                      type: 'advance_proposal_vote_reveal',
+                      actorId: identity.actorId,
+                    })
+                  }
+                >
+                  Continue
+                </button>
+              ) : (
+                <p className="text-xs text-slate-400">Waiting for host to continue.</p>
+              )}
             </div>
           </Section>
         ) : null}
@@ -921,7 +1009,20 @@ function App() {
                   {state.players.find((p) => p.actorId === state.round.ladyHolderId)?.displayName ?? 'Unknown'}
                 </strong>
               </p>
-              {state.round.ladyHolderId === identity.actorId ? (
+              {state.round.ladyPeekResult?.holderId === identity.actorId ? (
+                <div className="space-y-3 rounded-lg bg-slate-950/50 p-3 text-xs text-slate-200">
+                  <p>
+                    {state.players.find((p) => p.actorId === state.round.ladyPeekResult?.targetId)?.displayName}
+                    {' '}is <strong>{state.round.ladyPeekResult.alignment.toUpperCase()}</strong>.
+                  </p>
+                  <button
+                    className="w-full rounded-lg bg-amber-400 px-4 py-3 font-semibold text-slate-950"
+                    onClick={() => dispatch({ type: 'lady_acknowledge', actorId: identity.actorId })}
+                  >
+                    Continue
+                  </button>
+                </div>
+              ) : state.round.ladyHolderId === identity.actorId ? (
                 <div className="grid grid-cols-2 gap-2">
                   {state.players
                     .filter((p) => !state.round.ladyCheckedIds.includes(p.actorId) && p.actorId !== identity.actorId)
@@ -936,7 +1037,11 @@ function App() {
                     ))}
                 </div>
               ) : (
-                <p className="text-xs text-slate-400">Waiting for Lady holder action.</p>
+                <p className="text-xs text-slate-400">
+                  {state.round.ladyPeekResult
+                    ? 'Waiting for Lady holder to review the result.'
+                    : 'Waiting for Lady holder action.'}
+                </p>
               )}
             </div>
           </Section>
