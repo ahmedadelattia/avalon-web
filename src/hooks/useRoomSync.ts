@@ -46,17 +46,12 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
       ? createInitialState(roomCode, identity)
       : null
     stateRef.current = nextState
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setState(nextState)
     appliedActionIds.current = new Set()
     setError(null)
     setStatus(hasSupabaseConfig ? 'connecting' : 'offline_local')
-  }, [
-    identity.actorId,
-    identity.displayName,
-    isCreator,
-    roomCode,
-    shouldBootstrapLocalState,
-  ])
+  }, [identity, isCreator, roomCode, shouldBootstrapLocalState])
 
   const sendBroadcast = useCallback(
     async (event: 'intent' | 'commit' | 'system', payload: unknown) => {

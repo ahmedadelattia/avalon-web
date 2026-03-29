@@ -32,6 +32,7 @@ Default assassination mode is `evil_confirm_majority_excl_oberon`:
 - Timeout/non-vote counts as reject.
 - Confirmation passes only when `confirm > reject`.
 - Tie or failed confirmation means Good wins.
+- `allowGoodFail` defaults to `true` and can be toggled in lobby settings.
 
 Alternative mode `official`:
 - Assassin nomination resolves immediately.

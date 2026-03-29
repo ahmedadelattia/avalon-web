@@ -38,5 +38,9 @@ Canonical rule matrix and role behavior are documented in [`docs/rules.md`](docs
 - `evil_confirm_majority_excl_oberon` (default): evil confirmation vote after assassin nomination.
 - `official`: assassin nomination resolves immediately.
 
+## Quest Vote Rule
+- `allowGoodFail` (default: `true`): when enabled, good players may submit `Fail` cards.
+- Host can toggle this in lobby rules before game start.
+
 ## Trust Model
 This v1 is friendly-play host-authoritative sync and is not cheat-proof.

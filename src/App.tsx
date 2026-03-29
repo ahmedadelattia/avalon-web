@@ -183,6 +183,8 @@ function App() {
 
   const playerCount = state.players.length
   const canStart = Boolean(PLAYER_MATRIX[playerCount])
+  const canPlayFail =
+    myRole?.alignment === 'evil' || state.room.houseRules.allowGoodFail
 
   return (
     <main className="mx-auto min-h-dvh max-w-xl bg-[radial-gradient(circle_at_top,#172554,transparent_65%),linear-gradient(180deg,#020617,#0f172a)] px-4 py-6 text-slate-100">
@@ -202,7 +204,9 @@ function App() {
           {sync.error ? <p className="mt-2 text-xs text-rose-300">{sync.error}</p> : null}
         </header>
 
-        {myRole ? (
+        {myRole &&
+        state.phase !== 'lobby' &&
+        state.phase !== 'private_reveal' ? (
           <HoldToRevealButton
             roleLabel={roleLabel(myRole.role)}
             alignmentLabel={myRole.alignment.toUpperCase()}
@@ -288,6 +292,23 @@ function App() {
                     </select>
                   </label>
 
+                  <label className="flex items-center gap-2 rounded-lg bg-slate-900/70 p-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={state.room.houseRules.allowGoodFail}
+                      onChange={(event) => {
+                        dispatch({
+                          type: 'update_house_rules',
+                          actorId: identity.actorId,
+                          houseRules: {
+                            allowGoodFail: event.target.checked,
+                          },
+                        })
+                      }}
+                    />
+                    <span>Allow good players to vote Fail</span>
+                  </label>
+
                   <button
                     className="w-full rounded-lg bg-emerald-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-40"
                     disabled={!canStart}
@@ -335,11 +356,11 @@ function App() {
                   className="w-full rounded-lg bg-amber-400 px-4 py-3 font-semibold text-slate-950"
                   onClick={() => dispatch({ type: 'dismiss_reveal', actorId: identity.actorId })}
                 >
-                  Dismiss Reveal
+                  Confirm to Continue
                 </button>
               ) : (
                 <p className="text-xs text-slate-400">
-                  Waiting for others to dismiss ({state.revealDismissedBy.length}/{state.players.length})
+                  Waiting for others to confirm ({state.revealDismissedBy.length}/{state.players.length})
                 </p>
               )}
             </div>
@@ -457,23 +478,24 @@ function App() {
                     >
                       Success
                     </button>
-                    {myRole?.alignment === 'evil' ? (
-                      <button
-                        className="rounded-lg bg-rose-400 px-3 py-3 font-semibold text-slate-950"
-                        onClick={() => dispatch({ type: 'cast_quest_vote', actorId: identity.actorId, card: 'fail' })}
-                      >
-                        Fail
-                      </button>
-                    ) : (
-                      <div className="rounded-lg border border-slate-700 bg-slate-900/40 px-3 py-3 text-xs text-slate-400">
-                        Good cannot play Fail.
-                      </div>
-                    )}
+                    <button
+                      className="rounded-lg bg-rose-400 px-3 py-3 font-semibold text-slate-950 disabled:opacity-50"
+                      disabled={!canPlayFail}
+                      onClick={() => dispatch({ type: 'cast_quest_vote', actorId: identity.actorId, card: 'fail' })}
+                    >
+                      Fail
+                    </button>
                   </div>
                 )
               ) : (
                 <p className="text-xs text-slate-400">You are not on this quest team.</p>
               )}
+
+              {!canPlayFail ? (
+                <p className="text-xs text-slate-400">
+                  Good fail voting is disabled by lobby rules.
+                </p>
+              ) : null}
 
               <p className="text-xs text-slate-400">
                 Individual quest cards remain secret. Only aggregate fail count is revealed.

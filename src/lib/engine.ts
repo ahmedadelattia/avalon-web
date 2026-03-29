@@ -20,6 +20,7 @@ import type {
 export const DEFAULT_HOUSE_RULES: HouseRules = {
   assassinationMode: 'evil_confirm_majority_excl_oberon',
   assassinationConfirmTimeoutMs: 30000,
+  allowGoodFail: true,
 }
 
 function nowSafe(now?: number): number {
@@ -463,10 +464,9 @@ export function reduceGameState(state: GameState, action: EngineAction): GameSta
       if (!next.round.proposedTeam.includes(action.actorId)) {
         throw new Error('Only quest members may vote')
       }
-      const role = assignmentByActor(next.assignments, action.actorId)?.role
-      if (action.card === 'fail' && role) {
+      if (action.card === 'fail') {
         const isEvil = assignmentByActor(next.assignments, action.actorId)?.alignment === 'evil'
-        if (!isEvil) {
+        if (!isEvil && !next.room.houseRules.allowGoodFail) {
           throw new Error('Good players cannot submit fail')
         }
       }

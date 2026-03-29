@@ -35,6 +35,7 @@ export interface EnabledRoles {
 export interface HouseRules {
   assassinationMode: AssassinationRuleMode
   assassinationConfirmTimeoutMs: number
+  allowGoodFail: boolean
 }
 
 export interface RoomConfig {

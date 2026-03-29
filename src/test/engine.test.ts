@@ -55,8 +55,51 @@ describe('engine', () => {
     expect(state.winningReason).toContain('Five consecutive rejected teams')
   })
 
-  it('blocks good player from submitting fail card', () => {
+  it('allows good player to submit fail card by default', () => {
     let state = setupFivePlayers()
+    state = run(state, { type: 'start_game', actorId: 'p1' })
+
+    for (const p of state.players) {
+      state = run(state, { type: 'dismiss_reveal', actorId: p.actorId })
+    }
+
+    const leader = state.players[state.round.leaderOrder].actorId
+    const team = state.players.slice(0, 2).map((p) => p.actorId)
+    state = run(state, {
+      type: 'propose_team',
+      actorId: leader,
+      team,
+    })
+
+    for (const p of state.players) {
+      state = run(state, {
+        type: 'cast_proposal_vote',
+        actorId: p.actorId,
+        approve: true,
+      })
+    }
+
+    const goodQuestPlayer = team.find(
+      (id) => state.assignments.find((a) => a.actorId === id)?.alignment === 'good',
+    )
+
+    if (!goodQuestPlayer) return
+
+    state = run(state, {
+      type: 'cast_quest_vote',
+      actorId: goodQuestPlayer,
+      card: 'fail',
+    })
+    expect(state.round.questVotes[goodQuestPlayer]).toBe('fail')
+  })
+
+  it('blocks good fail vote when disabled in house rules', () => {
+    let state = setupFivePlayers()
+    state = run(state, {
+      type: 'update_house_rules',
+      actorId: 'p1',
+      houseRules: { allowGoodFail: false },
+    })
     state = run(state, { type: 'start_game', actorId: 'p1' })
 
     for (const p of state.players) {
