@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { InviteTools } from './components/InviteTools'
 import { HoldToRevealButton } from './components/HoldToRevealButton'
@@ -11,11 +11,14 @@ import {
 import {
   extractRoomCodeFromLocation,
   isValidRoomCode,
+  isSoloTestRoomCode,
   normalizeRoomCode,
   randomRoomCode,
   ROOM_CODE_LENGTH,
+  SOLO_TEST_ROOM_CODE,
 } from './lib/room'
 import { getRolePowerText, getQuestTeamSize, PLAYER_MATRIX } from './lib/rules'
+import { getRolePortrait } from './lib/roleAssets'
 import { createIdentity, getStoredName } from './lib/storage'
 import { currentTimeMs } from './lib/time'
 import type { EngineAction, PlayerIdentity } from './lib/types'
@@ -39,6 +42,203 @@ function Section({
   )
 }
 
+function QuestTrack({
+  outcomes,
+  currentQuest,
+  playerCount,
+}: {
+  outcomes: Array<{ success: boolean }>
+  currentQuest: number
+  playerCount: number
+}) {
+  return (
+    <div className="rounded-2xl border border-amber-800/40 bg-slate-900/70 p-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-amber-300">
+        Quest Track
+      </p>
+      <div className="mt-2 grid grid-cols-5 gap-2">
+        {Array.from({ length: 5 }, (_, idx) => {
+          const questNum = idx + 1
+          const done = idx < outcomes.length
+          const outcome = outcomes[idx]
+          const icon = done
+            ? outcome.success
+              ? '/icons/status/pass.png'
+              : '/icons/status/fail.png'
+            : null
+          const label = done ? (outcome.success ? 'Pass' : 'Fail') : 'Pending'
+          const isCurrent = !done && questNum === currentQuest
+          const teamSize = getQuestTeamSize(playerCount, questNum)
+          return (
+            <div
+              key={questNum}
+              className={`rounded-xl border p-2 text-center ${
+                isCurrent
+                  ? 'border-amber-400 bg-amber-400/10'
+                  : 'border-slate-700 bg-slate-950/50'
+              }`}
+            >
+              {icon ? (
+                <img
+                  src={icon}
+                  alt={label}
+                  className="mx-auto mt-1 h-9 w-9 rounded-full"
+                />
+              ) : (
+                <div className="mx-auto mt-1 flex h-9 w-9 items-center justify-center rounded-full border border-slate-500 text-xs font-semibold text-slate-200">
+                  {teamSize}
+                </div>
+              )}
+              <p className="mt-1 text-[10px] text-slate-300">
+                {`Quest ${questNum}`}
+              </p>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function RejectionTrack({ rejectionCount }: { rejectionCount: number }) {
+  return (
+    <div className="rounded-2xl border border-amber-800/40 bg-slate-900/70 p-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-amber-300">
+        Rejection Track
+      </p>
+      <div className="mt-2 grid grid-cols-5 gap-2">
+        {Array.from({ length: 5 }, (_, idx) => {
+          const attempt = idx + 1
+          const rejected = attempt <= rejectionCount
+          return (
+            <div
+              key={attempt}
+              className="rounded-xl border border-slate-700 bg-slate-950/50 p-2"
+            >
+              <div
+                className={`mx-auto flex h-8 w-8 items-center justify-center rounded-full border text-xs font-semibold ${
+                  rejected
+                    ? 'border-rose-400 bg-rose-500/80 text-white'
+                    : 'border-slate-500 bg-transparent text-slate-300'
+                }`}
+              >
+                {attempt}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function RoundTable({
+  players,
+  teamIds,
+  leaderId,
+  highlightIds,
+  selectableActorIds = [],
+  disabledActorIds = [],
+  onPlayerClick,
+  selectableHint = 'Tap to Add',
+  statusByActorId = {},
+  statusToneByActorId = {},
+}: {
+  players: Array<{
+    actorId: string
+    displayName: string
+    connected: boolean
+  }>
+  teamIds: string[]
+  leaderId: string | null
+  highlightIds: string[]
+  selectableActorIds?: string[]
+  disabledActorIds?: string[]
+  onPlayerClick?: (actorId: string) => void
+  selectableHint?: string
+  statusByActorId?: Record<string, string>
+  statusToneByActorId?: Record<string, 'good' | 'evil'>
+}) {
+  const radius = 38
+  const center = 50
+  return (
+    <div className="rounded-2xl border border-slate-700 bg-slate-900/70 p-3">
+      <p className="text-xs font-semibold uppercase tracking-[0.15em] text-amber-300">
+        Round Table
+      </p>
+      <div className="relative mx-auto mt-4 aspect-square w-full max-w-[21rem] rounded-full border-2 border-slate-600/80 bg-[radial-gradient(circle,#0f172a,#020617)]">
+        <div className="absolute inset-[22%] rounded-full border border-slate-700 bg-slate-950/40" />
+        {players.map((player, index) => {
+          const angle = (index / players.length) * Math.PI * 2 - Math.PI / 2
+          const x = center + radius * Math.cos(angle)
+          const y = center + radius * Math.sin(angle)
+          const onTeam = teamIds.includes(player.actorId)
+          const isLeader = leaderId === player.actorId
+          const highlighted = highlightIds.includes(player.actorId)
+          const isSelectable = selectableActorIds.includes(player.actorId)
+          const isDisabled = disabledActorIds.includes(player.actorId)
+          const interactive = Boolean(onPlayerClick && isSelectable)
+          const statusTone = statusToneByActorId[player.actorId]
+          return (
+            <div
+              key={player.actorId}
+              className="absolute -translate-x-1/2 -translate-y-1/2"
+              style={{ left: `${x}%`, top: `${y}%` }}
+            >
+              <button
+                type="button"
+                disabled={!interactive || isDisabled}
+                onClick={() => {
+                  if (!interactive || isDisabled || !onPlayerClick) return
+                  onPlayerClick(player.actorId)
+                }}
+                className={`w-20 rounded-lg border px-2 py-1 text-center text-[11px] ${
+                  highlighted
+                    ? 'border-rose-400 bg-rose-500/20'
+                    : onTeam
+                      ? 'border-emerald-400 bg-emerald-400/15'
+                      : 'border-slate-700 bg-slate-950/70'
+                } ${
+                  interactive
+                    ? 'cursor-pointer active:scale-[0.98]'
+                    : ''
+                } ${
+                  isDisabled ? 'opacity-45' : ''
+                }`}
+              >
+                <p className="truncate text-[10px] font-semibold text-slate-100">
+                  {player.displayName}
+                </p>
+                <p
+                  className={`text-[10px] ${
+                    statusTone === 'good'
+                      ? 'text-emerald-300'
+                      : statusTone === 'evil'
+                        ? 'text-rose-300'
+                        : 'text-slate-400'
+                  }`}
+                >
+                  {statusByActorId[player.actorId]
+                    ? statusByActorId[player.actorId]
+                    : isLeader
+                    ? 'Leader'
+                    : !player.connected
+                      ? 'Offline'
+                      : onTeam
+                        ? 'On Team'
+                        : isSelectable
+                          ? selectableHint
+                        : 'Player'}
+                </p>
+              </button>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 type RoomEntry =
   | { ready: false }
   | {
@@ -48,7 +248,22 @@ type RoomEntry =
       isCreator: boolean
     }
 
+const SOLO_BOTS = [
+  { actorId: 'solo-bot-1', displayName: 'Bot 1' },
+  { actorId: 'solo-bot-2', displayName: 'Bot 2' },
+  { actorId: 'solo-bot-3', displayName: 'Bot 3' },
+  { actorId: 'solo-bot-4', displayName: 'Bot 4' },
+] as const
+
 function App() {
+  const optionalRoleIconByKey: Record<string, string> = {
+    mordred: getRolePortrait('mordred'),
+    oberon: getRolePortrait('oberon'),
+    morgana: getRolePortrait('morgana'),
+    percival: getRolePortrait('percival'),
+    ladyOfTheLake: '/icons/features/lady_of_lake.webp',
+  }
+
   const deepLinkRoomCode = useMemo(() => {
     if (typeof window === 'undefined') return null
     return extractRoomCodeFromLocation(window.location)
@@ -58,6 +273,7 @@ function App() {
   const [roomCodeInput, setRoomCodeInput] = useState(() => deepLinkRoomCode ?? '')
   const [entry, setEntry] = useState<RoomEntry>({ ready: false })
   const [teamDraft, setTeamDraft] = useState<string[]>([])
+  const [isRevealOpen, setIsRevealOpen] = useState(false)
   const localIdentity = useMemo(() => createIdentity('Local Player'), [])
   const normalizedRoomInput = useMemo(
     () => normalizeRoomCode(roomCodeInput),
@@ -80,6 +296,9 @@ function App() {
 
   const state = entry.ready ? sync.state : null
   const identity = entry.ready ? entry.identity : null
+  const isSoloTestRoom = entry.ready
+    ? isSoloTestRoomCode(entry.roomCode)
+    : false
 
   const myRole = useMemo(() => {
     if (!state || !identity) return undefined
@@ -91,8 +310,6 @@ function App() {
     return state.visibility.byActorId[identity.actorId] ?? null
   }, [identity, state])
 
-  const connectedPlayers = state?.players.filter((p) => p.connected).length ?? 0
-
   const leaderId = state ? leaderActorId(state) : null
   const isLeader = Boolean(identity && leaderId === identity.actorId)
 
@@ -100,6 +317,69 @@ function App() {
     if (!entry.ready) return
     await sync.dispatch({ ...action, now: currentTimeMs() } as EngineAction)
   }
+
+  useEffect(() => {
+    if (!state) return
+    if (state.phase !== 'team_proposal') {
+      setTeamDraft([])
+    }
+  }, [state?.phase])
+
+  useEffect(() => {
+    setIsRevealOpen(false)
+  }, [state?.phase])
+
+  useEffect(() => {
+    if (!isSoloTestRoom || !state || !identity) return
+
+    if (state.phase === 'lobby' && state.players.length < 5) {
+      const existingIds = new Set(state.players.map((p) => p.actorId))
+      for (const bot of SOLO_BOTS) {
+        if (!existingIds.has(bot.actorId)) {
+          void dispatch({
+            type: 'player_join',
+            actorId: bot.actorId,
+            displayName: bot.displayName,
+          })
+        }
+      }
+      return
+    }
+
+    if (state.phase === 'private_reveal') {
+      for (const bot of SOLO_BOTS) {
+        if (state.revealDismissedBy.includes(bot.actorId)) continue
+        if (!state.players.some((p) => p.actorId === bot.actorId)) continue
+        void dispatch({ type: 'dismiss_reveal', actorId: bot.actorId })
+      }
+      return
+    }
+
+    if (state.phase === 'proposal_vote') {
+      for (const bot of SOLO_BOTS) {
+        if (!(bot.actorId in state.round.proposalVotes)) {
+          void dispatch({
+            type: 'cast_proposal_vote',
+            actorId: bot.actorId,
+            approve: true,
+          })
+        }
+      }
+      return
+    }
+
+    if (state.phase === 'quest_vote') {
+      for (const bot of SOLO_BOTS) {
+        if (!state.round.proposedTeam.includes(bot.actorId)) continue
+        if (bot.actorId in state.round.questVotes) continue
+        void dispatch({
+          type: 'cast_quest_vote',
+          actorId: bot.actorId,
+          card: 'success',
+        })
+      }
+    }
+  }, [dispatch, identity, isSoloTestRoom, state])
 
   function writeRoomToUrl(code: string) {
     if (typeof window === 'undefined') return
@@ -158,10 +438,7 @@ function App() {
                 value={roomCodeInput}
                 onChange={(event) =>
                   setRoomCodeInput(
-                    normalizeRoomCode(event.target.value).slice(
-                      0,
-                      ROOM_CODE_LENGTH,
-                    ),
+                    normalizeRoomCode(event.target.value).slice(0, ROOM_CODE_LENGTH),
                   )
                 }
               />
@@ -172,7 +449,9 @@ function App() {
                   !isValidRoomCode(normalizedRoomInput)
                 }
                 onClick={() => {
-                  const roomCode = normalizedRoomInput.slice(0, ROOM_CODE_LENGTH)
+                  const roomCode = isSoloTestRoomCode(normalizedRoomInput)
+                    ? SOLO_TEST_ROOM_CODE
+                    : normalizedRoomInput.slice(0, ROOM_CODE_LENGTH)
                   const identityNext = createIdentity(displayName.trim())
                   setEntry({
                     ready: true,
@@ -209,36 +488,165 @@ function App() {
   const canStart = Boolean(PLAYER_MATRIX[playerCount])
   const canPlayFail =
     myRole?.alignment === 'evil' || state.room.houseRules.allowGoodFail
+  const sortedPlayers = [...state.players].sort((a, b) => a.joinOrder - b.joinOrder)
+  const teamSizeRequired = PLAYER_MATRIX[state.players.length]
+    ? getQuestTeamSize(state.players.length, state.round.questNumber)
+    : 0
+  const canInteractWithRoundTable = state.phase === 'team_proposal' && isLeader
+  const isAssassin = state.assassination?.assassinId === identity.actorId
+  const assassinationTargetIds =
+    state.phase === 'assassination'
+      ? sortedPlayers
+          .filter((player) => actorRole(state, player.actorId)?.alignment === 'good')
+          .map((player) => player.actorId)
+      : []
+  const roundTableTeamIds =
+    state.phase === 'team_proposal'
+      ? teamDraft
+      : state.phase === 'assassination' && state.assassination?.suspectId
+        ? [state.assassination.suspectId]
+        : state.round.proposedTeam
+  const teamDraftLimitReached = teamDraft.length >= teamSizeRequired
+  const roundTableDisabledIds = canInteractWithRoundTable
+    ? sortedPlayers
+        .filter((player) => !teamDraft.includes(player.actorId) && teamDraftLimitReached)
+        .map((player) => player.actorId)
+    : []
+
+  const visiblePlayerIds = myVisibility
+    ? [...myVisibility.seesEvilIds, ...myVisibility.seesMerlinOrMorganaIds]
+    : []
+  const visiblePlayerNames = visiblePlayerIds
+    .map(
+      (id) =>
+        state.players.find((player) => player.actorId === id)?.displayName ?? id,
+    )
+    .filter((name, index, arr) => arr.indexOf(name) === index)
+  const revealHighlightIds = myVisibility
+    ? [
+        ...new Set([
+          ...myVisibility.seesEvilIds,
+          ...(myRole?.alignment === 'evil' && identity ? [identity.actorId] : []),
+        ]),
+      ]
+    : []
+  const roundTableHighlightIds =
+    state.phase === 'private_reveal'
+      ? revealHighlightIds
+      : isRevealOpen
+        ? revealHighlightIds
+        : []
+  const endgameRoleLabelByActorId: Record<string, string> =
+    state.phase === 'game_end'
+      ? Object.fromEntries(
+          state.assignments.map((assignment) => [
+            assignment.actorId,
+            roleLabel(assignment.role),
+          ]),
+        )
+      : {}
+  const endgameRoleToneByActorId: Record<string, 'good' | 'evil'> =
+    state.phase === 'game_end'
+      ? Object.fromEntries(
+          state.assignments.map((assignment) => [
+            assignment.actorId,
+            assignment.alignment,
+          ]),
+        )
+      : {}
 
   return (
     <main className="mx-auto min-h-dvh max-w-xl bg-[radial-gradient(circle_at_top,#172554,transparent_65%),linear-gradient(180deg,#020617,#0f172a)] px-4 py-6 text-slate-100">
       <div className="space-y-4">
-        <header className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-amber-300">Room</p>
-              <p className="text-2xl font-black tracking-wider">{state.room.roomCode}</p>
-            </div>
-            <div className="text-right text-xs text-slate-400">
-              <p>{sync.transportText}</p>
-              <p>{connectedPlayers}/{state.players.length} connected</p>
-              <p>Host epoch {state.hostEpoch}</p>
-            </div>
-          </div>
-          {sync.error ? <p className="mt-2 text-xs text-rose-300">{sync.error}</p> : null}
-          <div className="mt-3">
-            <InviteTools roomCode={state.room.roomCode} />
-          </div>
-        </header>
+        <InviteTools
+          roomCode={state.room.roomCode}
+          variant="floating"
+          floatingTopClass="top-[36%]"
+        />
 
-        {myRole &&
-        state.phase !== 'lobby' &&
-        state.phase !== 'private_reveal' ? (
-          <HoldToRevealButton
-            roleLabel={roleLabel(myRole.role)}
-            alignmentLabel={myRole.alignment.toUpperCase()}
-            power={getRolePowerText(myRole.role)}
+        <RoundTable
+          players={sortedPlayers}
+          teamIds={roundTableTeamIds}
+          leaderId={leaderId}
+          highlightIds={roundTableHighlightIds}
+          selectableActorIds={
+            canInteractWithRoundTable
+              ? sortedPlayers.map((p) => p.actorId)
+              : state.phase === 'assassination' && isAssassin
+                ? assassinationTargetIds
+                : []
+          }
+          disabledActorIds={
+            canInteractWithRoundTable
+              ? roundTableDisabledIds
+              : state.phase === 'assassination' && isAssassin
+                ? sortedPlayers
+                    .filter((player) => !assassinationTargetIds.includes(player.actorId))
+                    .map((player) => player.actorId)
+                : []
+          }
+          selectableHint={
+            state.phase === 'assassination' ? 'Tap to Nominate' : 'Tap to Add'
+          }
+          statusByActorId={
+            state.phase === 'game_end'
+              ? endgameRoleLabelByActorId
+              : state.phase === 'assassination' && state.assassination?.suspectId
+                ? { [state.assassination.suspectId]: 'Suspect' }
+                : {}
+          }
+          statusToneByActorId={
+            state.phase === 'game_end' ? endgameRoleToneByActorId : {}
+          }
+          onPlayerClick={(actorId) => {
+            if (canInteractWithRoundTable) {
+              setTeamDraft((prev) => {
+                if (prev.includes(actorId)) {
+                  return prev.filter((id) => id !== actorId)
+                }
+                if (prev.length >= teamSizeRequired) {
+                  return prev
+                }
+                return [...prev, actorId]
+              })
+              return
+            }
+
+            if (state.phase === 'assassination' && isAssassin) {
+              if (!assassinationTargetIds.includes(actorId)) return
+              void dispatch({
+                type: 'assassination_nominate',
+                actorId: identity.actorId,
+                suspectId: actorId,
+              })
+            }
+          }}
+        />
+
+        {sync.error ? <p className="text-xs text-rose-300">{sync.error}</p> : null}
+
+        {state.phase !== 'lobby' && state.phase !== 'private_reveal' ? (
+          <QuestTrack
+            outcomes={state.round.questOutcomes}
+            currentQuest={state.round.questNumber}
+            playerCount={state.players.length}
           />
+        ) : null}
+
+        {state.phase !== 'lobby' && state.phase !== 'private_reveal' ? (
+          myRole ? (
+            <HoldToRevealButton
+              roleKey={myRole.role}
+              roleLabel={roleLabel(myRole.role)}
+              alignmentLabel={myRole.alignment.toUpperCase()}
+              power={getRolePowerText(myRole.role)}
+              visiblePlayers={visiblePlayerNames}
+              open={isRevealOpen}
+              onOpenChange={setIsRevealOpen}
+              variant="floating"
+              floatingTopClass="top-[64%]"
+            />
+          ) : null
         ) : null}
 
         {state.phase === 'lobby' ? (
@@ -249,26 +657,14 @@ function App() {
                   ? `${playerCount} players ready. Avalon supports 5 to 10 players.`
                   : `Need 5-10 players. Current: ${playerCount}`}
               </p>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                {state.players.map((player) => (
-                  <div
-                    key={player.actorId}
-                    className="rounded-lg border border-slate-700 bg-slate-950/60 px-2 py-2"
-                  >
-                    <p className="font-semibold text-slate-200">{player.displayName}</p>
-                    <p className="text-slate-400">{player.connected ? 'Online' : 'Offline'}</p>
-                    <p className="text-amber-300">{player.isHost ? 'Host' : `Seat ${player.joinOrder + 1}`}</p>
-                  </div>
-                ))}
-              </div>
 
               {state.hostActorId === identity.actorId ? (
                 <div className="space-y-3 rounded-xl border border-slate-700 bg-slate-950/40 p-3">
                   <p className="text-xs uppercase tracking-wide text-slate-400">Role Toggles</p>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    {(
-                      [
-                        ['mordred', 'Mordred'],
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {(
+                    [
+                      ['mordred', 'Mordred'],
                         ['oberon', 'Oberon'],
                         ['morgana', 'Morgana'],
                         ['percival', 'Percival'],
@@ -289,6 +685,11 @@ function App() {
                               },
                             })
                           }}
+                        />
+                        <img
+                          src={optionalRoleIconByKey[key]}
+                          alt=""
+                          className="h-8 w-8 rounded-md border border-slate-700 object-cover"
                         />
                         <span>{label}</span>
                       </label>
@@ -404,39 +805,19 @@ function App() {
                 </strong>
               </p>
               <p>Quest size: {getQuestTeamSize(state.players.length, state.round.questNumber)}</p>
-              <p>Rejected proposals this round: {state.round.rejectionCount}/5</p>
 
               {isLeader ? (
                 <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    {state.players.map((player) => {
-                      const selected = teamDraft.includes(player.actorId)
-                      return (
-                        <button
-                          key={player.actorId}
-                          className={`rounded-lg border px-2 py-2 text-left ${
-                            selected
-                              ? 'border-amber-400 bg-amber-400/20'
-                              : 'border-slate-700 bg-slate-900/50'
-                          }`}
-                          onClick={() => {
-                            setTeamDraft((prev) => {
-                              if (prev.includes(player.actorId)) {
-                                return prev.filter((id) => id !== player.actorId)
-                              }
-                              return [...prev, player.actorId]
-                            })
-                          }}
-                        >
-                          {player.displayName}
-                        </button>
-                      )
-                    })}
-                  </div>
-
                   <button
-                    className="w-full rounded-lg bg-emerald-400 px-4 py-3 font-semibold text-slate-950"
-                    onClick={() => dispatch({ type: 'propose_team', actorId: identity.actorId, team: teamDraft })}
+                    className="w-full rounded-lg bg-emerald-400 px-4 py-3 font-semibold text-slate-950 disabled:opacity-40"
+                    disabled={teamDraft.length !== teamSizeRequired}
+                    onClick={() =>
+                      dispatch({
+                        type: 'propose_team',
+                        actorId: isSoloTestRoom && leaderId ? leaderId : identity.actorId,
+                        team: teamDraft,
+                      })
+                    }
                   >
                     Submit Team
                   </button>
@@ -572,25 +953,9 @@ function App() {
               </p>
 
               {state.assassination?.assassinId === identity.actorId ? (
-                <div className="grid grid-cols-2 gap-2">
-                  {state.players
-                    .filter((p) => actorRole(state, p.actorId)?.alignment === 'good')
-                    .map((player) => (
-                      <button
-                        key={player.actorId}
-                        className="rounded-lg border border-slate-700 bg-slate-900/60 px-2 py-2 text-left"
-                        onClick={() =>
-                          dispatch({
-                            type: 'assassination_nominate',
-                            actorId: identity.actorId,
-                            suspectId: player.actorId,
-                          })
-                        }
-                      >
-                        Nominate {player.displayName}
-                      </button>
-                    ))}
-                </div>
+                <p className="text-xs text-slate-400">
+                  Tap a good player on the round table to nominate.
+                </p>
               ) : null}
 
               {state.assassination?.suspectId ? (
@@ -654,33 +1019,15 @@ function App() {
                 {state.winner === 'good' ? 'Good Wins' : 'Evil Wins'}
               </p>
               <p className="text-sm text-slate-300">{state.winningReason}</p>
-              <div className="rounded-lg bg-slate-950/60 p-3 text-xs text-slate-300">
-                {state.assignments.map((assignment) => (
-                  <p key={assignment.actorId}>
-                    {state.players.find((p) => p.actorId === assignment.actorId)?.displayName}:{' '}
-                    {roleLabel(assignment.role)} ({assignment.alignment})
-                  </p>
-                ))}
-              </div>
             </div>
           </Section>
         ) : null}
 
-        <Section title="Quest Log">
-          <div className="space-y-2 text-sm">
-            {state.round.questOutcomes.length === 0 ? (
-              <p className="text-slate-400">No completed quests yet.</p>
-            ) : (
-              state.round.questOutcomes.map((quest) => (
-                <div key={quest.questNumber} className="rounded-lg bg-slate-950/50 p-2">
-                  <p>
-                    Quest {quest.questNumber}: {quest.success ? 'Success' : 'Fail'} ({quest.failCount} fail)
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-        </Section>
+        {state.phase !== 'lobby' ? (
+          <Section title="Rejection Track">
+            <RejectionTrack rejectionCount={state.round.rejectionCount} />
+          </Section>
+        ) : null}
       </div>
     </main>
   )

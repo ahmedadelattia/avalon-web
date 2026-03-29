@@ -3,25 +3,28 @@ import { describe, expect, it } from 'vitest'
 import { HoldToRevealButton } from '../components/HoldToRevealButton'
 
 describe('HoldToRevealButton', () => {
-  it('reveals private role data only while held', () => {
+  it('toggles private role data visibility', () => {
     render(
       <HoldToRevealButton
+        roleKey="merlin"
         roleLabel="Merlin"
         alignmentLabel="GOOD"
         power={{
           short: 'Sees evil except Mordred and Oberon',
           detail: 'Keep hidden from the assassin',
         }}
+        visiblePlayers={['Player 2', 'Player 5']}
       />,
     )
 
-    const button = screen.getByRole('button', { name: 'Hold to Reveal' })
+    const button = screen.getByRole('button', { name: 'Reveal Role & Powers' })
     expect(screen.queryByText('Merlin')).not.toBeInTheDocument()
 
-    fireEvent.mouseDown(button)
+    fireEvent.click(button)
     expect(screen.getByText('Merlin')).toBeInTheDocument()
+    expect(screen.getByText(/Known players:/)).toBeInTheDocument()
 
-    fireEvent.mouseUp(button)
+    fireEvent.click(screen.getByRole('button', { name: 'Hide Role Details' }))
     expect(screen.queryByText('Merlin')).not.toBeInTheDocument()
   })
 })

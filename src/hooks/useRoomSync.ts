@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createInitialState, reduceGameState } from '../lib/engine'
 import { toCommit, toIntent } from '../lib/protocol'
+import { isSoloTestRoomCode } from '../lib/room'
 import { hasSupabaseConfig, supabase } from '../lib/supabase'
 import type {
   ClientIntent,
@@ -24,12 +25,14 @@ type TransportStatus =
   | 'reconnecting'
 
 export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
-  const shouldBootstrapLocalState = isCreator || !hasSupabaseConfig
+  const isSoloTestRoom = isSoloTestRoomCode(roomCode)
+  const useRealtime = hasSupabaseConfig && !isSoloTestRoom
+  const shouldBootstrapLocalState = isCreator || !useRealtime
   const [state, setState] = useState<GameState | null>(() =>
     shouldBootstrapLocalState ? createInitialState(roomCode, identity) : null,
   )
   const [status, setStatus] = useState<TransportStatus>(
-    hasSupabaseConfig ? 'connecting' : 'offline_local',
+    useRealtime ? 'connecting' : 'offline_local',
   )
   const [error, setError] = useState<string | null>(null)
 
@@ -50,8 +53,8 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
     setState(nextState)
     appliedActionIds.current = new Set()
     setError(null)
-    setStatus(hasSupabaseConfig ? 'connecting' : 'offline_local')
-  }, [identity, isCreator, roomCode, shouldBootstrapLocalState])
+    setStatus(useRealtime ? 'connecting' : 'offline_local')
+  }, [identity, isCreator, roomCode, shouldBootstrapLocalState, useRealtime])
 
   const sendBroadcast = useCallback(
     async (event: 'intent' | 'commit' | 'system', payload: unknown) => {
@@ -116,7 +119,7 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
       setState({ ...next })
       stateRef.current = next
 
-      if (!hasSupabaseConfig || !supabase) return
+      if (!useRealtime || !supabase) return
 
       const commit = toCommit(
         roomCode,
@@ -129,7 +132,7 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
 
       await sendBroadcast('commit', commit)
     },
-    [applyActionLocal, identity.actorId, roomCode, sendBroadcast],
+    [applyActionLocal, identity.actorId, roomCode, sendBroadcast, useRealtime],
   )
 
   const dispatch = useCallback(
@@ -141,7 +144,7 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
       if (appliedActionIds.current.has(intent.actionId)) return
       appliedActionIds.current.add(intent.actionId)
 
-      if (!hasSupabaseConfig || !supabase) {
+      if (!useRealtime || !supabase) {
         applyActionLocal(action)
         return
       }
@@ -153,11 +156,11 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
 
       await sendBroadcast('intent', intent)
     },
-    [applyActionLocal, identity.actorId, maybeCommitAsHost, roomCode, sendBroadcast],
+    [applyActionLocal, identity.actorId, maybeCommitAsHost, roomCode, sendBroadcast, useRealtime],
   )
 
   useEffect(() => {
-    if (!hasSupabaseConfig || !supabase) return
+    if (!useRealtime || !supabase) return
 
     let cancelled = false
     const channel = supabase.channel(`room:${roomCode}`, {
@@ -328,17 +331,18 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
     maybeCommitAsHost,
     roomCode,
     sendBroadcast,
+    useRealtime,
   ])
 
   const transportText = useMemo(() => {
-    if (!hasSupabaseConfig) {
+    if (!useRealtime) {
       return 'Local mode only (set Supabase env vars for internet rooms).'
     }
     if (status === 'connected') return 'Connected'
     if (status === 'connecting') return 'Connecting...'
     if (status === 'reconnecting') return 'Reconnecting...'
     return 'Offline local mode'
-  }, [status])
+  }, [status, useRealtime])
 
   return {
     state,
