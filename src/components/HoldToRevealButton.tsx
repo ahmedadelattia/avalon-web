@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { getRolePortrait } from '../lib/roleAssets'
 import type { Role, RolePowerText } from '../lib/types'
 
@@ -8,6 +9,7 @@ interface Props {
   alignmentLabel: string
   power: RolePowerText
   visiblePlayers: string[]
+  belowPrimary?: ReactNode
 }
 
 export function HoldToRevealButton({
@@ -16,6 +18,7 @@ export function HoldToRevealButton({
   alignmentLabel,
   power,
   visiblePlayers,
+  belowPrimary,
 }: Props) {
   const [open, setOpen] = useState(false)
 
@@ -29,6 +32,7 @@ export function HoldToRevealButton({
       >
         {open ? 'Hide Role Details' : 'Reveal Role & Powers'}
       </button>
+      {belowPrimary ? <div className="mt-2">{belowPrimary}</div> : null}
       {open ? (
         <div className="mt-3 rounded-lg bg-slate-950/80 p-3 text-sm">
           <div className="flex items-center gap-3">

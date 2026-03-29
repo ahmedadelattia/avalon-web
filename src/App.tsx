@@ -553,6 +553,26 @@ function App() {
               alignmentLabel={myRole.alignment.toUpperCase()}
               power={getRolePowerText(myRole.role)}
               visiblePlayers={visiblePlayerNames}
+              belowPrimary={
+                state.phase === 'private_reveal'
+                  ? !state.revealDismissedBy.includes(identity.actorId)
+                    ? (
+                      <button
+                        className="w-full rounded-lg bg-amber-400 px-4 py-3 text-sm font-semibold text-slate-950"
+                        onClick={() =>
+                          dispatch({ type: 'dismiss_reveal', actorId: identity.actorId })
+                        }
+                      >
+                        Confirm to Continue
+                      </button>
+                    )
+                    : (
+                      <p className="text-xs text-slate-400">
+                        Waiting for others to confirm ({state.revealDismissedBy.length}/{state.players.length})
+                      </p>
+                    )
+                  : null
+              }
             />
           ) : null
         ) : null}
@@ -699,18 +719,9 @@ function App() {
                   ) : null}
                 </div>
               ) : null}
-              {!state.revealDismissedBy.includes(identity.actorId) ? (
-                <button
-                  className="w-full rounded-lg bg-amber-400 px-4 py-3 font-semibold text-slate-950"
-                  onClick={() => dispatch({ type: 'dismiss_reveal', actorId: identity.actorId })}
-                >
-                  Confirm to Continue
-                </button>
-              ) : (
-                <p className="text-xs text-slate-400">
-                  Waiting for others to confirm ({state.revealDismissedBy.length}/{state.players.length})
-                </p>
-              )}
+              <p className="text-xs text-slate-400">
+                Confirm using the button under Reveal Role & Powers above.
+              </p>
             </div>
           </Section>
         ) : null}
