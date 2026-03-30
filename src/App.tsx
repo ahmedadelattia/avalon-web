@@ -133,7 +133,15 @@ function ResultIcon({ success }: { success: boolean }) {
   )
 }
 
-function TeamResultPanel({ approved }: { approved: boolean }) {
+function TeamResultPanel({
+  approved,
+  yay,
+  nay,
+}: {
+  approved: boolean
+  yay: number
+  nay: number
+}) {
   return (
     <ParchmentPanel label="Voting Result">
       <div className="space-y-3 py-1 text-center">
@@ -145,6 +153,9 @@ function TeamResultPanel({ approved }: { approved: boolean }) {
           {approved ? 'Team Approved' : 'Team Rejected'}
         </p>
         <ResultIcon success={approved} />
+        <p className="text-sm text-[#3a4a5a]">
+          {yay} Yea &nbsp;·&nbsp; {nay} Nay
+        </p>
       </div>
     </ParchmentPanel>
   )
@@ -792,7 +803,7 @@ function App() {
             state.phase === 'assassination' ? 'Tap to Nominate' : 'Tap to Add'
           }
           statusByActorId={
-            state.phase === 'proposal_vote_reveal'
+            state.phase === 'proposal_vote_reveal' && !state.room.houseRules.hideVotes
               ? proposalVoteStatusByActorId
               : state.phase === 'game_end'
               ? endgameRoleLabelByActorId
@@ -801,7 +812,7 @@ function App() {
                 : {}
           }
           statusToneByActorId={
-            state.phase === 'proposal_vote_reveal'
+            state.phase === 'proposal_vote_reveal' && !state.room.houseRules.hideVotes
               ? proposalVoteToneByActorId
               : state.phase === 'game_end'
                 ? endgameRoleToneByActorId
@@ -961,7 +972,7 @@ function App() {
                         })
                       }}
                     />
-                    <span>Hide vote counts until reveal</span>
+                    <span>Hide who voted what (tally still shown)</span>
                   </label>
 
                   <button
@@ -1094,7 +1105,11 @@ function App() {
 
         {state.phase === 'proposal_vote_reveal' ? (
           <div className="space-y-4">
-            <TeamResultPanel approved={Boolean(state.round.proposalApproved)} />
+            <TeamResultPanel
+              approved={Boolean(state.round.proposalApproved)}
+              yay={Object.values(state.round.proposalVotes).filter(Boolean).length}
+              nay={Object.values(state.round.proposalVotes).filter((v) => !v).length}
+            />
             {state.hostActorId === identity.actorId ? (
               <button
                 className="w-full rounded border border-[#1e3a5a] bg-[#1a2d4a] px-4 py-3 font-serif font-bold uppercase tracking-wider text-[#f0d878]"
