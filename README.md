@@ -128,3 +128,7 @@ This is a friendly-play, host-authoritative implementation. The host's client re
 ## Contributing / Testers Welcome
 
 Found a bug? Something feels off with the rules? Open an issue. Pull requests welcome.
+
+## Special Thanks
+
+Special thanks for Hazem AlBulqini for introducing me to this game, and my friends at UMD for the countless game nights that totally remained civilized and never escalated to shouting matches when the wrong person gets accused of being evil. 
