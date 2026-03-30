@@ -431,6 +431,8 @@ function App() {
   const [entry, setEntry] = useState<RoomEntry>({ ready: false })
   const [teamDraft, setTeamDraft] = useState<string[]>([])
   const [isRevealOpen, setIsRevealOpen] = useState(false)
+  const [reorderMode, setReorderMode] = useState(false)
+  const [openRoleInfo, setOpenRoleInfo] = useState<string | null>(null)
   const localIdentity = useMemo(() => createIdentity('Local Player'), [])
   const normalizedRoomInput = useMemo(
     () => normalizeRoomCode(roomCodeInput),
@@ -883,41 +885,125 @@ function App() {
                 </span>
               </div>
 
+              {/* Player order — visible to all, editable by host */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-[#3a4a5a]">Seating Order</p>
+                  {state.hostActorId === identity.actorId ? (
+                    <button
+                      className="text-xs text-[#1a2d4a] underline underline-offset-2"
+                      onClick={() => setReorderMode((v) => !v)}
+                    >
+                      {reorderMode ? 'Done' : 'Reorder'}
+                    </button>
+                  ) : null}
+                </div>
+                <div className="space-y-1">
+                  {sortedPlayers.map((player, idx) => (
+                    <div
+                      key={player.actorId}
+                      className="flex items-center gap-2 rounded border border-[#2d4a6a]/20 bg-[#d4ccbe]/20 px-2 py-1.5 text-sm text-[#1e1408]"
+                    >
+                      <span className="w-5 text-center font-serif text-xs text-[#3a4a5a]">{idx + 1}</span>
+                      <span className="flex-1">{player.displayName}</span>
+                      {state.hostActorId === identity.actorId && player.actorId !== identity.actorId ? (
+                        reorderMode ? (
+                          <div className="flex gap-1">
+                            <button
+                              disabled={idx === 0}
+                              className="rounded px-1.5 py-0.5 text-xs font-bold text-[#1a2d4a] disabled:opacity-30"
+                              onClick={() => {
+                                const newOrder = sortedPlayers.map((p) => p.actorId)
+                                ;[newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]]
+                                void dispatch({ type: 'reorder_players', actorId: identity.actorId, orderedIds: newOrder })
+                              }}
+                            >↑</button>
+                            <button
+                              disabled={idx === sortedPlayers.length - 1}
+                              className="rounded px-1.5 py-0.5 text-xs font-bold text-[#1a2d4a] disabled:opacity-30"
+                              onClick={() => {
+                                const newOrder = sortedPlayers.map((p) => p.actorId)
+                                ;[newOrder[idx], newOrder[idx + 1]] = [newOrder[idx + 1], newOrder[idx]]
+                                void dispatch({ type: 'reorder_players', actorId: identity.actorId, orderedIds: newOrder })
+                              }}
+                            >↓</button>
+                          </div>
+                        ) : (
+                          <button
+                            className="rounded px-1.5 py-0.5 text-xs font-semibold text-[#7a1a1a] hover:bg-[#7a1a1a]/10"
+                            onClick={() =>
+                              void dispatch({ type: 'kick_player', actorId: identity.actorId, targetId: player.actorId })
+                            }
+                          >
+                            Kick
+                          </button>
+                        )
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               {state.hostActorId === identity.actorId ? (
                 <div className="space-y-3 rounded border border-[#2d4a6a]/40 bg-[#d4ccbe]/20 p-3">
                   <p className="text-sm font-medium text-[#3a4a5a]">Role Toggles</p>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1.5">
                     {(
                       [
-                        ['mordred', 'Mordred'],
-                        ['oberon', 'Oberon'],
-                        ['morgana', 'Morgana'],
-                        ['percival', 'Percival'],
-                        ['ladyOfTheLake', 'Lady of the Lake'],
+                        ['mordred', 'Mordred', "Hidden from Merlin's sight at game start. A strong asset for the evil team."],
+                        ['oberon', 'Oberon', "Evil, but doesn't know his evil allies and they don't know him. Operates entirely alone."],
+                        ['morgana', 'Morgana', "Appears as a Merlin candidate to Percival, creating dangerous doubt. Only meaningful with Percival in the game — enabling Morgana automatically enables Percival."],
+                        ['percival', 'Percival', "Sees Merlin and Morgana as possible Merlins. Works best when paired with Morgana. Automatically enabled when Morgana is enabled."],
+                        ['ladyOfTheLake', 'Lady of the Lake', "After quests 2, 3, and 4, the Lady token holder may secretly inspect another player's alignment."],
                       ] as const
-                    ).map(([key, label]) => (
-                      <label key={key} className="flex items-center gap-2 rounded border border-[#2d4a6a]/30 bg-[#d4ccbe]/30 p-2 text-[#1e1408]">
-                        <input
-                          type="checkbox"
-                          checked={state.room.enabledRoles[key]}
-                          onChange={(event) => {
-                            dispatch({
-                              type: 'update_roles',
-                              actorId: identity.actorId,
-                              enabledRoles: {
-                                ...state.room.enabledRoles,
-                                [key]: event.target.checked,
-                              },
-                            })
-                          }}
-                        />
-                        <img
-                          src={optionalRoleIconByKey[key]}
-                          alt=""
-                          className="h-8 w-8 rounded border border-[#2d4a6a]/40 object-cover"
-                        />
-                        <span className="text-sm">{label}</span>
-                      </label>
+                    ).map(([key, label, hint]) => (
+                      <div key={key} className="overflow-hidden rounded border border-[#2d4a6a]/30 bg-[#d4ccbe]/30">
+                        <div className="flex items-center gap-2 p-2">
+                          <label className="flex flex-1 cursor-pointer items-center gap-2 text-[#1e1408]">
+                            <input
+                              type="checkbox"
+                              checked={state.room.enabledRoles[key]}
+                              onChange={(event) => {
+                                const newRoles = {
+                                  ...state.room.enabledRoles,
+                                  [key]: event.target.checked,
+                                }
+                                if (key === 'morgana' && event.target.checked) {
+                                  newRoles.percival = true
+                                }
+                                dispatch({
+                                  type: 'update_roles',
+                                  actorId: identity.actorId,
+                                  enabledRoles: newRoles,
+                                })
+                              }}
+                            />
+                            <img
+                              src={optionalRoleIconByKey[key]}
+                              alt=""
+                              className="h-8 w-8 rounded border border-[#2d4a6a]/40 object-cover"
+                            />
+                            <span className="text-sm">{label}</span>
+                          </label>
+                          <button
+                            type="button"
+                            aria-label={`Info about ${label}`}
+                            onClick={() => setOpenRoleInfo(openRoleInfo === key ? null : key)}
+                            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px] font-bold leading-none transition-colors ${
+                              openRoleInfo === key
+                                ? 'border-[#1a2d4a] bg-[#1a2d4a] text-[#e8c8b0]'
+                                : 'border-[#2d4a6a]/60 text-[#3a4a5a]'
+                            }`}
+                          >
+                            i
+                          </button>
+                        </div>
+                        {openRoleInfo === key ? (
+                          <div className="border-t border-[#2d4a6a]/20 px-3 pb-2.5 pt-2 text-xs leading-relaxed text-[#3a4a5a]">
+                            {hint}
+                          </div>
+                        ) : null}
+                      </div>
                     ))}
                   </div>
 
@@ -1313,15 +1399,27 @@ function App() {
 
         {state.phase === 'game_end' ? (
           <Section title="Game Result">
-            <div className="space-y-2">
-              <p
-                className={`font-serif text-2xl font-black uppercase tracking-wide ${
-                  state.winner === 'good' ? 'text-[#1a4a1e]' : 'text-[#6a1010]'
-                }`}
-              >
-                {state.winner === 'good' ? 'Good Wins' : 'Evil Wins'}
-              </p>
-              <p className="text-sm text-[#3a4a5a]">{state.winningReason}</p>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <p
+                  className={`font-serif text-2xl font-black uppercase tracking-wide ${
+                    state.winner === 'good' ? 'text-[#1a4a1e]' : 'text-[#6a1010]'
+                  }`}
+                >
+                  {state.winner === 'good' ? 'Good Wins' : 'Evil Wins'}
+                </p>
+                <p className="text-sm text-[#3a4a5a]">{state.winningReason}</p>
+              </div>
+              {state.hostActorId === identity.actorId ? (
+                <button
+                  className="w-full rounded border border-[#1e3a5a] bg-[#1a2d4a] px-4 py-3 font-serif font-bold uppercase tracking-wider text-[#e8c8b0]"
+                  onClick={() => dispatch({ type: 'new_game', actorId: identity.actorId })}
+                >
+                  New Game
+                </button>
+              ) : (
+                <p className="text-sm text-[#3a4a5a]">Waiting for host to start a new game.</p>
+              )}
             </div>
           </Section>
         ) : null}
