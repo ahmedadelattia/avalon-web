@@ -632,6 +632,67 @@ export function reduceGameState(state: GameState, action: EngineAction): GameSta
       break
     }
 
+    case 'kick_player': {
+      ensureHost(next, action.actorId)
+      ensureLobby(next)
+      if (action.targetId === action.actorId) {
+        throw new Error('Host cannot kick themselves')
+      }
+      next.players = next.players.filter((p) => p.actorId !== action.targetId)
+      // Repack joinOrder to keep it contiguous
+      next.players
+        .sort((a, b) => a.joinOrder - b.joinOrder)
+        .forEach((p, i) => { p.joinOrder = i })
+      break
+    }
+
+    case 'reorder_players': {
+      ensureHost(next, action.actorId)
+      if (next.phase !== 'lobby' && next.phase !== 'game_end') {
+        throw new Error('Players can only be reordered in lobby or after game end')
+      }
+      const idSet = new Set(next.players.map((p) => p.actorId))
+      if (
+        action.orderedIds.length !== next.players.length ||
+        !action.orderedIds.every((id) => idSet.has(id))
+      ) {
+        throw new Error('orderedIds must contain exactly the current player set')
+      }
+      for (const player of next.players) {
+        player.joinOrder = action.orderedIds.indexOf(player.actorId)
+      }
+      break
+    }
+
+    case 'new_game': {
+      ensureHost(next, action.actorId)
+      if (next.phase !== 'game_end') {
+        throw new Error('new_game only allowed after game ends')
+      }
+      next.phase = 'lobby'
+      next.assignments = []
+      next.visibility = null
+      next.revealDismissedBy = []
+      next.round = {
+        questNumber: 1,
+        leaderOrder: 0,
+        rejectionCount: 0,
+        proposedTeam: [],
+        proposalVotes: {},
+        proposalApproved: null,
+        questVotes: {},
+        questOutcomes: [],
+        ladyHolderId: null,
+        ladyCheckedIds: [],
+        ladyPeekTargetId: null,
+        ladyPeekResult: null,
+      }
+      next.assassination = null
+      next.winner = null
+      next.winningReason = null
+      break
+    }
+
     default:
       break
   }

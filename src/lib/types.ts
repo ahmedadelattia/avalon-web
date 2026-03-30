@@ -203,6 +203,9 @@ export type EngineAction =
       now: number
     }
   | { type: 'assassination_timeout'; actorId: string; now: number }
+  | { type: 'reorder_players'; actorId: string; orderedIds: string[]; now: number }
+  | { type: 'new_game'; actorId: string; now: number }
+  | { type: 'kick_player'; actorId: string; targetId: string; now: number }
 
 export interface RolePowerText {
   short: string
