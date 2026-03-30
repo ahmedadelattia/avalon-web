@@ -39,6 +39,12 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
   const stateRef = useRef<GameState | null>(state)
   const appliedActionIds = useRef<Set<string>>(new Set())
   const channelRef = useRef<ReturnType<NonNullable<typeof supabase>['channel']> | null>(null)
+  // Fix 1: track whether initial join has been sent to avoid re-sending on reconnect
+  const hasJoinedRef = useRef(false)
+  // Fix 2: track pending intents awaiting a host commit, for retry
+  const pendingIntentsRef = useRef<
+    Map<string, { intent: ClientIntent<EngineAction>; timer: ReturnType<typeof setTimeout> }>
+  >(new Map())
 
   useEffect(() => {
     stateRef.current = state
@@ -52,6 +58,11 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setState(nextState)
     appliedActionIds.current = new Set()
+    hasJoinedRef.current = false
+    for (const { timer } of pendingIntentsRef.current.values()) {
+      clearTimeout(timer)
+    }
+    pendingIntentsRef.current = new Map()
     setError(null)
     setStatus(useRealtime ? 'connecting' : 'offline_local')
   }, [identity, isCreator, roomCode, shouldBootstrapLocalState, useRealtime])
@@ -99,6 +110,12 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
         return
       }
     }
+
+    // Fix 2: clear all pending intent retries — state is now fresh from host
+    for (const { timer } of pendingIntentsRef.current.values()) {
+      clearTimeout(timer)
+    }
+    pendingIntentsRef.current = new Map()
 
     stateRef.current = commit.stateSnapshotDelta
     setState(commit.stateSnapshotDelta)
@@ -155,9 +172,41 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
       }
 
       await sendBroadcast('intent', intent)
+
+      // Fix 2: retry intent after 3s if no commit from host has been received
+      const timer = setTimeout(async () => {
+        if (!pendingIntentsRef.current.has(intent.actionId)) return
+        pendingIntentsRef.current.delete(intent.actionId)
+        await sendBroadcast('intent', intent)
+      }, 3000)
+      pendingIntentsRef.current.set(intent.actionId, { intent, timer })
     },
     [applyActionLocal, identity.actorId, maybeCommitAsHost, roomCode, sendBroadcast, useRealtime],
   )
+
+  // Fix 4: host broadcasts full state every 10s during active game phases
+  useEffect(() => {
+    if (!useRealtime || !supabase) return
+
+    const interval = setInterval(async () => {
+      const current = stateRef.current
+      if (!current) return
+      if (current.hostActorId !== identity.actorId) return
+      if (current.phase === 'lobby' || current.phase === 'game_end') return
+
+      const commit = toCommit(
+        roomCode,
+        identity.actorId,
+        current.seq,
+        current.hostEpoch,
+        `heartbeat-${Date.now()}`,
+        current,
+      )
+      await sendBroadcast('commit', commit)
+    }, 10000)
+
+    return () => clearInterval(interval)
+  }, [identity.actorId, roomCode, sendBroadcast, useRealtime])
 
   useEffect(() => {
     if (!useRealtime || !supabase) return
@@ -219,6 +268,19 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
             })
             stateRef.current = migrated
             setState(migrated)
+
+            // Fix 3: broadcast full state commit so all peers immediately sync to new host
+            if (!cancelled) {
+              const migrationCommit = toCommit(
+                roomCode,
+                candidate.actorId,
+                migrated.seq,
+                migrated.hostEpoch,
+                `host-migration-${Date.now()}`,
+                migrated,
+              )
+              await sendBroadcast('commit', migrationCommit)
+            }
           }
         }
       })
@@ -266,24 +328,33 @@ export function useRoomSync({ roomCode, identity, isCreator }: RoomOptions) {
           })
 
           if (isCreator) {
-            const joinAction: EngineAction = {
-              type: 'player_join',
-              actorId: identity.actorId,
-              displayName: identity.displayName,
-              now: Date.now(),
-            }
-            await maybeCommitAsHost('creator-join', joinAction)
-          } else {
-            await sendBroadcast(
-              'intent',
-              toIntent(roomCode, identity.actorId, 'lobby', {
+            // Fix 1: only commit creator join once, not on every reconnect
+            if (!hasJoinedRef.current) {
+              hasJoinedRef.current = true
+              const joinAction: EngineAction = {
                 type: 'player_join',
                 actorId: identity.actorId,
                 displayName: identity.displayName,
                 now: Date.now(),
-              }),
-            )
+              }
+              await maybeCommitAsHost('creator-join', joinAction)
+            }
+          } else {
+            // Fix 1: only send player_join intent on first connection, not reconnects
+            if (!hasJoinedRef.current) {
+              hasJoinedRef.current = true
+              await sendBroadcast(
+                'intent',
+                toIntent(roomCode, identity.actorId, 'lobby', {
+                  type: 'player_join',
+                  actorId: identity.actorId,
+                  displayName: identity.displayName,
+                  now: Date.now(),
+                }),
+              )
+            }
 
+            // Always request resync — covers both first join and mid-game reconnect
             await sendBroadcast('system', {
               type: 'resync_requested',
               roomCode,
